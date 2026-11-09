@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Services Hub - OCR & Telegram Parser</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col gap-2"></div>
+
+    <!-- Header / Navigation -->
+    <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+            <!-- App Brand -->
+            <div class="flex items-center gap-3">
+                <div id="brandIcon" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent">
+                        AI Services Hub
+                    </h1>
+                    <p id="brandSubtitle" class="text-xs text-slate-400">Gemini Myanmar-English OCR &bull; Telegram &bull; Database &bull; YouTube</p>
+                </div>
+            </div>
+
+            <!-- Service Switcher (Segmented Control) -->
+            <div class="bg-slate-950/80 p-1 rounded-xl border border-slate-800 flex items-center gap-1 shadow-inner">
+                <button type="button" id="tabOCR" class="service-nav-btn active flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition duration-150">
+                    <i data-lucide="scan-text" class="w-4 h-4"></i>
+                    <span>Gemini OCR</span>
+                </button>
+                <button type="button" id="tabTelegram" class="service-nav-btn text-slate-400 hover:text-slate-200 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition duration-150">
+                    <i data-lucide="message-square" class="w-4 h-4"></i>
+                    <span>Telegram Parser</span>
+                </button>
+                <button type="button" id="tabDatabase" class="service-nav-btn text-slate-400 hover:text-slate-200 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition duration-150">
+                    <i data-lucide="database" class="w-4 h-4"></i>
+                    <span>Database to JSON</span>
+                </button>
+                <button type="button" id="tabYouTube" class="service-nav-btn text-slate-400 hover:text-slate-200 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition duration-150">
+                    <i data-lucide="youtube" class="w-4 h-4 text-red-500"></i>
+                    <span>YouTube to JSON</span>
+                </button>
+            </div>
+
+            <!-- Right Status / History Actions -->
+            <div class="flex items-center gap-2">
+                <div id="ocrStatusBadge" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="modelLabel">gemini-3.5-flash-lite</span>
+                </div>
+                <button id="btnToggleHistory" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition border border-slate-700/60">
+                    <i data-lucide="history" class="w-4 h-4"></i>
+                    <span id="historyBtnLabel" class="hidden sm:inline">OCR History</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-8 flex flex-col gap-8">
+
+        <!-- ============================================================== -->
+        <!-- SERVICE 1: GEMINI OCR VIEW                                     -->
+        <!-- ============================================================== -->
+        <div id="viewOCR" class="flex flex-col gap-8">
+
+            <!-- Top Ingestion & Controls Card -->
+            <section class="glass-panel rounded-2xl p-6 shadow-xl border border-slate-800/80">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+                        <i data-lucide="upload-cloud" class="w-4 h-4 text-indigo-400"></i>
+                        Upload Images or Folders
+                    </h2>
+                    <span class="text-xs text-slate-400">Supports .png, .jpg, .jpeg, .jpe, .webp, .bmp</span>
+                </div>
+
+                <!-- Hidden native inputs (outside dropzone) -->
+                <input type="file" id="fileInput" multiple accept=".png,.jpg,.jpeg,.jpe,.webp,.bmp" class="hidden">
+                <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden">
+
+                <!-- Drag & Drop Zone -->
+                <div id="dropZone" class="border-2 border-dashed border-slate-700 hover:border-indigo-500/70 bg-slate-900/40 rounded-xl p-8 text-center transition cursor-pointer flex flex-col items-center justify-center gap-3">
+                    <div class="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <i data-lucide="image-plus" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-200">
+                            Drag and drop your images or folder here, or click to browse
+                        </p>
+                        <p class="text-xs text-slate-500 mt-1">Single files, multiple files, or entire folders</p>
+                    </div>
+
+                    <div class="flex items-center gap-3 mt-2">
+                        <button type="button" id="btnPickFiles" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+                            <i data-lucide="files" class="w-3.5 h-3.5"></i>
+                            Choose Files
+                        </button>
+                        <button type="button" id="btnPickFolder" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+                            <i data-lucide="folder-up" class="w-3.5 h-3.5"></i>
+                            Choose Folder
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selected Files List -->
+                <div id="selectedFilesSection" class="hidden mt-4 pt-4 border-t border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span id="selectedCountBadge" class="text-xs font-medium text-slate-400">0 files selected</span>
+                        <button id="btnClearFiles" class="text-xs text-rose-400 hover:text-rose-300 transition flex items-center gap-1">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear all
+                        </button>
+                    </div>
+                    <div id="filesBadgeContainer" class="flex flex-wrap gap-2 max-h-36 overflow-y-auto pr-1"></div>
+                </div>
+
+                <!-- Parameters: Batch size (1-10) and Custom Prompt -->
+                <div class="mt-6 pt-6 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-12 gap-5">
+                    <!-- Batch size range 1 to 10 -->
+                    <div class="md:col-span-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="batchSizeInput" class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                                <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400"></i>
+                                Batch Size (file_per_batch)
+                            </label>
+                            <span id="batchSizeVal" class="text-xs font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">2</span>
+                        </div>
+                        <input type="range" id="batchSizeInput" min="1" max="10" value="2" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
+                            <span>1</span>
+                            <span>5</span>
+                            <span>10</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-2">Images processed per Gemini batch request.</p>
+                    </div>
+
+                    <!-- Custom Prompt Override -->
+                    <div class="md:col-span-8 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="promptInput" class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                                <i data-lucide="message-square" class="w-3.5 h-3.5 text-indigo-400"></i>
+                                OCR Prompt Instructions (content)
+                            </label>
+                            <button type="button" id="btnResetPrompt" class="text-[11px] text-indigo-400 hover:text-indigo-300 transition">
+                                Reset to Default
+                            </button>
+                        </div>
+                        <textarea id="promptInput" rows="2" class="w-full text-xs bg-slate-950/80 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500 transition resize-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- Action Run Button -->
+                <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-2">
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-400">
+                            <input type="checkbox" id="mockModeCheck" class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0">
+                            <span>Use Mock Simulation Mode (Zero API calls)</span>
+                        </label>
+                    </div>
+
+                    <button id="btnRunOCR" disabled class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition duration-200">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        <span>Execute OCR Recognition</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Progress / Loading Indicator -->
+            <section id="loadingSection" class="hidden glass-panel rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-4 border border-indigo-500/20">
+                <div class="relative w-14 h-14">
+                    <div class="absolute inset-0 rounded-full border-4 border-slate-800 border-t-indigo-500 animate-spin"></div>
+                    <div class="absolute inset-2 rounded-full border-4 border-slate-800 border-b-violet-500 animate-spin" style="animation-direction: reverse;"></div>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-200">Processing OCR with Gemini...</h3>
+                    <p id="loadingStatusText" class="text-xs text-slate-400 mt-1">Chunking files into batches and transcribing...</p>
+                </div>
+            </section>
+
+            <!-- Live Results Section -->
+            <section id="resultsSection" class="hidden flex flex-col gap-4">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                            <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i>
+                            OCR Results
+                        </h2>
+                        <span id="resultsCountBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-medium">0 items</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="btnCopyAll" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                            Copy All Text
+                        </button>
+                        <button id="btnToggleRawJSON" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                            <i data-lucide="code" class="w-3.5 h-3.5"></i>
+                            Raw JSON
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Raw JSON Collapsible Box -->
+                <div id="rawJsonBox" class="hidden glass-panel rounded-xl p-4 border border-slate-800">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+                        <span class="text-xs font-mono text-slate-400">Structured Response JSON</span>
+                        <button id="btnCopyJSON" class="text-xs text-indigo-400 hover:text-indigo-300">Copy JSON</button>
+                    </div>
+                    <pre id="rawJsonContent" class="text-[11px] font-mono text-emerald-400/90 overflow-x-auto p-2 bg-slate-950 rounded max-h-64"></pre>
+                </div>
+
+                <!-- Dynamic Result Cards Grid -->
+                <div id="resultCardsContainer" class="grid grid-cols-1 gap-6"></div>
+            </section>
+
+            <!-- History Drawer / Section -->
+            <section id="historySection" class="hidden glass-panel rounded-2xl p-6 border border-slate-800">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="archive" class="w-5 h-5 text-indigo-400"></i>
+                        <h2 class="text-base font-semibold text-slate-100">OCR History Log</h2>
+                        <span class="text-xs text-slate-500 font-mono">(from logs/gemini_ocr_log.jsonl)</span>
+                    </div>
+                    <button id="btnRefreshHistory" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 transition">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                    </button>
+                </div>
+                <div id="historyListContainer" class="flex flex-col gap-3">
+                    <p class="text-xs text-slate-500 text-center py-6">Loading history...</p>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- SERVICE 2: TELEGRAM CHAT PARSER VIEW                          -->
+        <!-- ============================================================== -->
+        <div id="viewTelegram" class="hidden flex flex-col gap-8">
+
+            <!-- Telegram Upload Card -->
+            <section class="glass-panel rounded-2xl p-6 shadow-xl border border-slate-800/80">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+                            <i data-lucide="message-square" class="w-4 h-4 text-indigo-400"></i>
+                            Telegram Export HTML to JSON
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Parse Telegram Desktop exported <code class="font-mono text-indigo-300">messages.html</code> into structured JSON</p>
+                    </div>
+                    <span class="text-xs px-2.5 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">messages.html</span>
+                </div>
+
+                <!-- Hidden Native Inputs (outside dropzone to eliminate bubbling conflicts) -->
+                <input type="file" id="tgFileInput" accept=".html,.htm" class="hidden">
+                <input type="file" id="tgFolderInput" webkitdirectory directory multiple class="hidden">
+                <input type="file" id="tgPhotosInput" webkitdirectory directory multiple class="hidden">
+
+                <!-- Telegram Drag & Drop Zone -->
+                <div id="tgDropZone" class="border-2 border-dashed border-slate-700 hover:border-indigo-500/70 bg-slate-900/40 rounded-xl p-8 text-center transition cursor-pointer flex flex-col items-center justify-center gap-3">
+                    <div class="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <i data-lucide="file-code" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-200">
+                            Drag and drop your <span class="text-indigo-400 font-semibold">export folder</span> or <span class="text-indigo-400 font-semibold">messages.html</span> here
+                        </p>
+                        <p class="text-xs text-slate-500 mt-1">Exported from Telegram Desktop &bull; extracts text, replies, media, and reactions with counts</p>
+                    </div>
+
+                    <div class="flex items-center gap-3 mt-2">
+                        <button type="button" id="btnPickTgFile" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+                            <i data-lucide="file" class="w-3.5 h-3.5"></i>
+                            Select messages.html
+                        </button>
+                        <button type="button" id="btnPickTgFolder" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+                            <i data-lucide="folder-up" class="w-3.5 h-3.5"></i>
+                            Choose Export Folder
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selected File Display -->
+                <div id="tgSelectedFileContainer" class="hidden mt-4 p-3 bg-slate-900/70 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <i data-lucide="file-check" class="w-4 h-4 text-emerald-400"></i>
+                        <span id="tgSelectedFileName" class="text-xs font-mono text-slate-200">messages.html</span>
+                        <span id="tgSelectedFileSize" class="text-[11px] text-slate-500">(20.8 KB)</span>
+                        <span id="tgSelectedPhotosBadge" class="hidden text-[10px] px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">+ 0 photos</span>
+                    </div>
+                    <button type="button" id="btnRemoveTgFile" class="text-slate-400 hover:text-rose-400 p-1 rounded transition">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Options & Convert Button -->
+                <div class="mt-6 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-400">
+                        <input type="checkbox" id="tgIncludeServiceCheck" checked class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0">
+                        <span>Include Service Messages (Date separators and status notices)</span>
+                    </label>
+
+                    <button id="btnConvertTelegram" disabled class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition duration-200">
+                        <i data-lucide="file-json" class="w-4 h-4"></i>
+                        <span>Parse &amp; Convert to JSON</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Telegram Conversion Progress -->
+            <section id="tgLoadingSection" class="hidden glass-panel rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-4 border border-indigo-500/20">
+                <div class="w-12 h-12 rounded-full border-4 border-slate-800 border-t-indigo-500 animate-spin"></div>
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-200">Parsing Telegram HTML...</h3>
+                    <p class="text-xs text-slate-400 mt-1">Extracting messages, replies, media, and reaction counts...</p>
+                </div>
+            </section>
+
+            <!-- Telegram Results Section -->
+            <section id="tgResultsSection" class="hidden flex flex-col gap-6">
+
+                <!-- Chat Overview Stats Banner -->
+                <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-indigo-500/20">
+                            <span id="tgChatAvatar">M</span>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 id="tgChatTitle" class="text-base font-bold text-white">Min Thike Tun</h3>
+                                <span class="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Export Validated</span>
+                            </div>
+                            <p id="tgExportSource" class="text-xs text-slate-400 font-mono mt-0.5">Source: messages.html</p>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Badges -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 text-center">
+                            <span class="text-[10px] text-slate-500 block uppercase font-mono">Total Messages</span>
+                            <span id="tgStatTotal" class="text-xs font-bold text-slate-200">37</span>
+                        </div>
+                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 text-center">
+                            <span class="text-[10px] text-slate-500 block uppercase font-mono">Media</span>
+                            <span id="tgStatMedia" class="text-xs font-bold text-slate-200">3</span>
+                        </div>
+                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 text-center">
+                            <span class="text-[10px] text-slate-500 block uppercase font-mono">Replies</span>
+                            <span id="tgStatReplies" class="text-xs font-bold text-slate-200">2</span>
+                        </div>
+                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 text-center">
+                            <span class="text-[10px] text-slate-500 block uppercase font-mono">Reactions</span>
+                            <span id="tgStatReactions" class="text-xs font-bold text-pink-400">2</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Bar & Search Filter -->
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <div class="relative flex-1 max-w-sm">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                        <input type="text" id="tgSearchInput" placeholder="Search message text or sender..." class="w-full text-xs bg-slate-900/80 border border-slate-700/80 rounded-lg pl-9 pr-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button id="btnAttachTgPhotos" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                            <i data-lucide="image-plus" class="w-3.5 h-3.5 text-violet-400"></i>
+                            <span>Attach Photos</span>
+                        </button>
+                        <button id="btnCopyTgJSON" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                            Copy JSON
+                        </button>
+                        <button id="btnDownloadTgJSON" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 transition shadow">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            Download messages.json
+                        </button>
+                        <button id="btnToggleTgRawJSON" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                            <i data-lucide="code" class="w-3.5 h-3.5"></i>
+                            View JSON
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Raw Telegram JSON Collapsible -->
+                <div id="tgRawJsonBox" class="hidden glass-panel rounded-xl p-4 border border-slate-800">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+                        <span class="text-xs font-mono text-slate-400">Structured Telegram Output JSON</span>
+                        <span class="text-xs text-slate-500">Auto-formatted</span>
+                    </div>
+                    <pre id="tgRawJsonContent" class="text-[11px] font-mono text-emerald-400/90 overflow-x-auto p-2 bg-slate-950 rounded max-h-72"></pre>
+                </div>
+
+                <!-- Chat Feed / Messages Timeline -->
+                <div id="tgMessageFeedContainer" class="flex flex-col gap-3"></div>
+
+            </section>
+
+            <!-- Telegram History Section -->
+            <section id="tgHistorySection" class="hidden glass-panel rounded-2xl p-6 border border-slate-800">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="archive" class="w-5 h-5 text-indigo-400"></i>
+                        <h2 class="text-base font-semibold text-slate-100">Telegram Conversion History</h2>
+                        <span class="text-xs text-slate-500 font-mono">(from logs/telegram_parser_log.jsonl)</span>
+                    </div>
+                    <button id="btnRefreshTgHistory" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 transition">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                    </button>
+                </div>
+                <div id="tgHistoryListContainer" class="flex flex-col gap-3">
+                    <p class="text-xs text-slate-500 text-center py-6">Loading history...</p>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- SERVICE 3: DATABASE TO JSON VIEW                               -->
+        <!-- ============================================================== -->
+        <div id="viewDatabase" class="hidden flex flex-col gap-8">
+
+            <!-- Database Upload Card -->
+            <section class="glass-panel rounded-2xl p-6 shadow-xl border border-slate-800/80">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+                            <i data-lucide="database" class="w-4 h-4 text-cyan-400"></i>
+                            Database Export to JSON
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Parse SQL dumps (.sql), SQLite (.sqlite, .db), CSV/TSV, and Excel (.xlsx) files</p>
+                    </div>
+                    <span class="text-xs px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">SQL &bull; SQLite &bull; CSV &bull; Excel</span>
+                </div>
+
+                <!-- Hidden Native Input -->
+                <input type="file" id="dbFileInput" accept=".sql,.db,.sqlite,.sqlite3,.csv,.tsv,.xlsx" class="hidden">
+
+                <!-- Database Drag & Drop Zone -->
+                <div id="dbDropZone" class="border-2 border-dashed border-slate-700 hover:border-cyan-500/70 bg-slate-900/40 rounded-xl p-8 text-center transition cursor-pointer flex flex-col items-center justify-center gap-3">
+                    <div class="w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                        <i data-lucide="table-2" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-200">
+                            Drag and drop your <span class="text-cyan-400 font-semibold">database export</span> file here, or click to browse
+                        </p>
+                        <p class="text-xs text-slate-500 mt-1">Supports multi-table SQL dumps, SQLite binary DBs, CSV/TSV, or multi-sheet Excel</p>
+                    </div>
+
+                    <button type="button" id="btnPickDbFile" class="mt-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+                        <i data-lucide="file-up" class="w-3.5 h-3.5"></i>
+                        Choose Database File
+                    </button>
+                </div>
+
+                <!-- Selected File Display -->
+                <div id="dbSelectedFileContainer" class="hidden mt-4 p-3 bg-slate-900/70 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <i data-lucide="file-check" class="w-4 h-4 text-emerald-400"></i>
+                        <span id="dbSelectedFileName" class="text-xs font-mono text-slate-200">sales_database.sql</span>
+                        <span id="dbSelectedFileSize" class="text-[11px] text-slate-500">(15.4 KB)</span>
+                    </div>
+                    <button type="button" id="btnRemoveDbFile" class="text-slate-400 hover:text-rose-400 p-1 rounded transition">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Action Button -->
+                <div class="mt-6 pt-6 border-t border-slate-800/80 flex items-center justify-end">
+                    <button id="btnConvertDatabase" disabled class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-2 transition duration-200">
+                        <i data-lucide="file-json" class="w-4 h-4"></i>
+                        <span>Parse &amp; Convert Database to JSON</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Loading Progress -->
+            <section id="dbLoadingSection" class="hidden glass-panel rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-4 border border-cyan-500/20">
+                <div class="w-12 h-12 rounded-full border-4 border-slate-800 border-t-cyan-500 animate-spin"></div>
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-200">Parsing Database Structure...</h3>
+                    <p class="text-xs text-slate-400 mt-1">Extracting tables, schemas, data types, and row records...</p>
+                </div>
+            </section>
+
+            <!-- Database Results Section -->
+            <section id="dbResultsSection" class="hidden flex flex-col gap-6">
+
+                <!-- Database Overview Stats Banner -->
+                <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-500 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-cyan-500/20">
+                            <i data-lucide="database" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 id="dbName" class="text-base font-bold text-white">sample_sales</h3>
+                                <span id="dbFormatBadge" class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase">SQL</span>
+                            </div>
+                            <p id="dbSource" class="text-xs text-slate-400 font-mono mt-0.5">Source: sales_database.sql</p>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Badges -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 text-center">
+                            <span class="text-[10px] text-slate-500 block uppercase font-mono">Total Tables</span>
+                            <span id="dbStatTables" class="text-xs font-bold text-cyan-300">2</span>
+                        </div>
+                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 text-center">
+                            <span class="text-[10px] text-slate-500 block uppercase font-mono">Total Rows</span>
+                            <span id="dbStatRows" class="text-xs font-bold text-slate-200">180</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Switcher Tabs -->
+                <div class="flex flex-col gap-2">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Tables in Database</span>
+                    <div id="dbTableTabsContainer" class="flex flex-wrap items-center gap-2 pb-1 overflow-x-auto"></div>
+                </div>
+
+                <!-- Active Table Grid Card -->
+                <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col gap-4">
+                    <!-- Table Header & Action Bar -->
+                    <div class="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="table" class="w-4 h-4 text-cyan-400"></i>
+                            <h4 id="dbActiveTableName" class="font-bold text-sm text-white">sales_table</h4>
+                            <span id="dbActiveTableRowCount" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono font-medium">0 rows</span>
+                        </div>
+
+                        <!-- Search & Controls -->
+                        <div class="flex items-center flex-wrap gap-2">
+                            <div class="relative max-w-xs">
+                                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                                <input type="text" id="dbSearchInput" placeholder="Search rows..." class="w-48 text-xs bg-slate-900/80 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-slate-200 focus:outline-none focus:border-cyan-500 transition">
+                            </div>
+
+                            <select id="dbPageSizeSelect" class="text-xs bg-slate-900/80 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-cyan-500">
+                                <option value="25">25 rows</option>
+                                <option value="50" selected>50 rows</option>
+                                <option value="100">100 rows</option>
+                                <option value="all">All rows</option>
+                            </select>
+
+                            <button id="btnCopyTableJSON" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition" title="Copy active table as JSON array">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                <span>Copy Table JSON</span>
+                            </button>
+
+                            <button id="btnDownloadTableJSON" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition" title="Download active table JSON">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>Download Table</span>
+                            </button>
+
+                            <button id="btnDownloadDbJSON" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-1.5 transition shadow" title="Download complete database JSON">
+                                <i data-lucide="hard-drive-download" class="w-3.5 h-3.5"></i>
+                                <span>Download Full DB</span>
+                            </button>
+
+                            <button id="btnToggleDbRawJSON" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                                <i data-lucide="code" class="w-3.5 h-3.5"></i>
+                                <span>Raw JSON</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Raw JSON Collapsible -->
+                    <div id="dbRawJsonBox" class="hidden glass-panel rounded-xl p-4 border border-slate-800">
+                        <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+                            <span class="text-xs font-mono text-slate-400">Structured Database Output JSON</span>
+                            <button id="btnCopyDbJSON" class="text-xs text-cyan-400 hover:text-cyan-300">Copy Full DB JSON</button>
+                        </div>
+                        <pre id="dbRawJsonContent" class="text-[11px] font-mono text-cyan-400/90 overflow-x-auto p-2 bg-slate-950 rounded max-h-72"></pre>
+                    </div>
+
+                    <!-- Responsive Data Table Container -->
+                    <div id="dbTableContainer" class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60 max-h-[500px] overflow-y-auto"></div>
+
+                    <!-- Pagination Controls -->
+                    <div id="dbPaginationContainer" class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800/80">
+                        <span id="dbPaginationInfo">Showing rows 1 - 5 of 5</span>
+                        <div class="flex items-center gap-1.5">
+                            <button id="btnDbPrevPage" class="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition">
+                                Previous
+                            </button>
+                            <span id="dbPageIndicator" class="px-2 font-mono text-slate-400">1 / 1</span>
+                            <button id="btnDbNextPage" class="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Database History Section -->
+            <section id="dbHistorySection" class="hidden glass-panel rounded-2xl p-6 border border-slate-800">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="archive" class="w-5 h-5 text-cyan-400"></i>
+                        <h2 class="text-base font-semibold text-slate-100">Database Conversion History</h2>
+                        <span class="text-xs text-slate-500 font-mono">(from logs/database_parser_log.jsonl)</span>
+                    </div>
+                    <button id="btnRefreshDbHistory" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 transition">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                    </button>
+                </div>
+                <div id="dbHistoryListContainer" class="flex flex-col gap-3">
+                    <p class="text-xs text-slate-500 text-center py-6">Loading history...</p>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- SERVICE 4: YOUTUBE CHANNEL DATA TO JSON VIEW                   -->
+        <!-- ============================================================== -->
+        <div id="viewYouTube" class="hidden flex flex-col gap-8">
+
+            <!-- Ingestion & Controls Card -->
+            <section class="glass-panel rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl">
+                <div class="flex items-center justify-between pb-6 border-b border-slate-800/80 flex-wrap gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                            <i data-lucide="youtube" class="w-5 h-5 text-red-500"></i>
+                            YouTube Channel Data to JSON
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Extract channel profile metadata, subscriber stats, and video catalog into structured JSON</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs px-2.5 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-mono">Live Handle &bull; Channel URL &bull; HTML / JSON</span>
+                        <button type="button" id="btnLoadYtSample" class="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-medium rounded-lg border border-red-500/30 flex items-center gap-1.5 transition">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-red-400"></i>
+                            <span>Load Sample Channel</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Channel Query Input Bar -->
+                <div class="mt-6 flex flex-col sm:flex-row items-center gap-3">
+                    <div class="relative flex-1 w-full">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                            <i data-lucide="at-sign" class="w-4 h-4"></i>
+                        </div>
+                        <input type="text" id="ytQueryInput" placeholder="Enter channel handle or URL (e.g. @veritasium, @mkbhd, https://youtube.com/@channel/videos)" class="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/50 transition">
+                    </div>
+                    <button type="button" id="btnFetchYouTube" class="w-full sm:w-auto px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-red-600/25 flex items-center justify-center gap-2 transition duration-200">
+                        <i data-lucide="search" class="w-4 h-4"></i>
+                        <span>Fetch Channel</span>
+                    </button>
+                </div>
+
+                <!-- Divider with OR label -->
+                <div class="relative my-6 text-center">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-slate-800"></div>
+                    </div>
+                    <div class="relative inline-block px-3 bg-[#0e1424] text-[11px] font-mono text-slate-500 uppercase tracking-wider">
+                        Or import saved export file
+                    </div>
+                </div>
+
+                <!-- Hidden Native File Input -->
+                <input type="file" id="ytFileInput" accept=".html,.htm,.json" class="hidden">
+
+                <!-- File Drag & Drop Zone -->
+                <div id="ytDropZone" class="border-2 border-dashed border-slate-700 hover:border-red-500/70 bg-slate-900/40 rounded-xl p-6 text-center transition cursor-pointer flex flex-col items-center justify-center gap-2">
+                    <div class="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                        <i data-lucide="file-code" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-200">
+                            Drag &amp; drop a saved YouTube <span class="text-red-400 font-semibold">HTML or JSON</span> export file here
+                        </p>
+                        <p class="text-xs text-slate-500 mt-0.5">Supports channel page HTML snapshots with ytInitialData or pre-extracted JSON</p>
+                    </div>
+
+                    <button type="button" id="btnPickYtFile" class="mt-1 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+                        <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                        Choose File
+                    </button>
+                </div>
+
+                <!-- Selected File Display -->
+                <div id="ytSelectedFileContainer" class="hidden mt-4 p-3 bg-slate-900/70 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <i data-lucide="file-check" class="w-4 h-4 text-emerald-400"></i>
+                        <span id="ytSelectedFileName" class="text-xs font-mono text-slate-200">channel.html</span>
+                        <span id="ytSelectedFileSize" class="text-[11px] text-slate-500">(240 KB)</span>
+                    </div>
+                    <button type="button" id="btnRemoveYtFile" class="text-slate-400 hover:text-rose-400 p-1 rounded transition">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Loading Progress -->
+            <section id="ytLoadingSection" class="hidden glass-panel rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-4 border border-red-500/20">
+                <div class="w-12 h-12 rounded-full border-4 border-slate-800 border-t-red-500 animate-spin"></div>
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-200">Extracting YouTube Channel Data...</h3>
+                    <p class="text-xs text-slate-400 mt-1">Retrieving channel profile, subscribers, badges, and video catalog...</p>
+                </div>
+            </section>
+
+            <!-- YouTube Results Section -->
+            <section id="ytResultsSection" class="hidden flex flex-col gap-6">
+
+                <!-- Channel Hero Card with Banner & Avatar -->
+                <div class="glass-panel rounded-2xl overflow-hidden border border-slate-800 shadow-2xl">
+                    <!-- Banner -->
+                    <div id="ytHeroBanner" class="yt-banner-container h-36 sm:h-48 w-full bg-slate-800">
+                        <div class="yt-banner-overlay w-full h-full flex items-end p-5 sm:p-6"></div>
+                    </div>
+
+                    <!-- Channel Profile Details -->
+                    <div class="p-6 sm:p-8 pt-0 relative flex flex-col gap-4">
+                        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12 sm:-mt-16">
+                            <!-- Avatar + Name -->
+                            <div class="flex items-end gap-4">
+                                <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-4 border-[#0b0f19] bg-slate-900 shadow-xl flex-shrink-0">
+                                    <img id="ytAvatarImg" src="" alt="Avatar" class="w-full h-full object-cover">
+                                </div>
+                                <div class="mb-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h3 id="ytChannelName" class="text-xl sm:text-2xl font-bold text-white leading-tight">Channel Name</h3>
+                                        <span id="ytVerifiedBadge" class="hidden items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300" title="Verified YouTube Channel">
+                                            <i data-lucide="badge-check" class="w-3.5 h-3.5 text-blue-400"></i>
+                                            <span>Verified</span>
+                                        </span>
+                                    </div>
+                                    <p id="ytChannelHandle" class="text-xs text-slate-400 font-mono mt-0.5">@handle</p>
+                                </div>
+                            </div>
+
+                            <!-- Channel Stats Pills & External Link -->
+                            <div class="flex flex-wrap items-center gap-2">
+                                <div class="bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800 text-center">
+                                    <span class="text-[10px] text-slate-500 block uppercase font-mono">Subscribers</span>
+                                    <span id="ytStatSubscribers" class="text-xs font-bold text-red-400">0</span>
+                                </div>
+                                <div class="bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800 text-center">
+                                    <span class="text-[10px] text-slate-500 block uppercase font-mono">Videos Extracted</span>
+                                    <span id="ytStatVideos" class="text-xs font-bold text-slate-200">0</span>
+                                </div>
+                                <a id="ytExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                                    <span>YouTube</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Channel Description -->
+                        <div id="ytDescContainer" class="mt-2 text-xs text-slate-300 leading-relaxed bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
+                            <p id="ytDescriptionText" class="line-clamp-3 whitespace-pre-line">No description available.</p>
+                            <button type="button" id="btnToggleYtDesc" class="mt-1 text-[11px] text-red-400 hover:text-red-300 font-medium">Show more</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video Catalog Section -->
+                <div class="glass-panel rounded-2xl p-5 sm:p-6 border border-slate-800 flex flex-col gap-5">
+                    <!-- Toolbar & Controls -->
+                    <div class="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-800">
+                        <div class="flex items-center gap-2.5">
+                            <i data-lucide="play-square" class="w-4 h-4 text-red-500"></i>
+                            <h4 class="font-bold text-sm text-white">Video Catalog</h4>
+                            <span id="ytCatalogBadge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono font-medium">0 videos</span>
+                        </div>
+
+                        <!-- Search, Filter & Actions -->
+                        <div class="flex items-center flex-wrap gap-2">
+                            <!-- Search -->
+                            <div class="relative max-w-xs">
+                                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                                <input type="text" id="ytSearchInput" placeholder="Search videos..." class="w-44 text-xs bg-slate-900/80 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-slate-200 focus:outline-none focus:border-red-500 transition">
+                            </div>
+
+                            <!-- Sort -->
+                            <select id="ytSortSelect" class="text-xs bg-slate-900/80 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-red-500">
+                                <option value="default">Default Order</option>
+                                <option value="views">Most Views</option>
+                                <option value="duration">Longest First</option>
+                            </select>
+
+                            <!-- View Mode Toggle -->
+                            <div class="bg-slate-900/80 p-0.5 rounded-lg border border-slate-800 flex items-center">
+                                <button type="button" id="btnYtViewGrid" class="p-1.5 rounded text-white bg-slate-800 transition" title="Card Grid View">
+                                    <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button type="button" id="btnYtViewTable" class="p-1.5 rounded text-slate-400 hover:text-slate-200 transition" title="Table View">
+                                    <i data-lucide="list" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+
+                            <!-- Copy & Download JSON -->
+                            <button id="btnCopyYtJSON" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition" title="Copy full channel JSON">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                <span>Copy JSON</span>
+                            </button>
+
+                            <button id="btnDownloadYtJSON" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 text-white flex items-center gap-1.5 transition shadow" title="Download channel.json">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>Download JSON</span>
+                            </button>
+
+                            <button id="btnToggleYtRawJSON" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                                <i data-lucide="code" class="w-3.5 h-3.5"></i>
+                                <span>Raw JSON</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Collapsible Raw JSON Container -->
+                    <div id="ytRawJsonBox" class="hidden glass-panel rounded-xl p-4 border border-slate-800">
+                        <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+                            <span class="text-xs font-mono text-slate-400">Exported Channel & Video Catalog JSON</span>
+                            <button id="btnCopyRawYtJSON" class="text-xs text-red-400 hover:text-red-300">Copy JSON</button>
+                        </div>
+                        <pre id="ytRawJsonContent" class="text-[11px] font-mono text-red-400/90 overflow-x-auto p-2 bg-slate-950 rounded max-h-72"></pre>
+                    </div>
+
+                    <!-- Video Cards Grid View -->
+                    <div id="ytVideoGridContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+
+                    <!-- Video Table View (Hidden by default) -->
+                    <div id="ytVideoTableContainer" class="hidden overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60 max-h-[550px] overflow-y-auto"></div>
+
+                    <!-- Pagination Controls -->
+                    <div id="ytPaginationContainer" class="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-800/80">
+                        <span id="ytPaginationInfo">Showing 1 - 8 of 8 videos</span>
+                        <div class="flex items-center gap-1.5">
+                            <button id="btnYtPrevPage" class="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition">
+                                Previous
+                            </button>
+                            <span id="ytPageIndicator" class="px-2 font-mono text-slate-400">1 / 1</span>
+                            <button id="btnYtNextPage" class="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- YouTube History Section -->
+            <section id="ytHistorySection" class="hidden glass-panel rounded-2xl p-6 border border-slate-800">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="archive" class="w-5 h-5 text-red-500"></i>
+                        <h2 class="text-base font-semibold text-slate-100">YouTube Conversion History</h2>
+                        <span class="text-xs text-slate-500 font-mono">(from logs/youtube_parser_log.jsonl)</span>
+                    </div>
+                    <button id="btnRefreshYtHistory" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 transition">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                    </button>
+                </div>
+                <div id="ytHistoryListContainer" class="flex flex-col gap-3">
+                    <p class="text-xs text-slate-500 text-center py-6">Loading history...</p>
+                </div>
+            </section>
+
+        </div>
+
+    </main>
+
+    <!-- Global Image Zoom Modal -->
+    <div id="imageModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm hidden flex items-center justify-center p-4 cursor-pointer" onclick="closeImageModal()">
+        <div class="relative max-w-4xl max-h-[90vh]">
+            <img id="modalImage" src="" alt="Enlarged preview" class="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain border border-slate-700">
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-auto border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+        AI Services Hub &bull; Gemini OCR &bull; Telegram Parser &bull; Database to JSON &bull; YouTube to JSON
+    </footer>
+
+    <!-- App JavaScript -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

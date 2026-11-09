@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / Packaging / Eggs
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local Environment Variables & Secrets (Keep your API key private!)
+.env
+.env.local
+venv/
+env/
+.venv/
+ENV/
+
+# Application Runtime Logs & Uploads
+logs/
+*.log
+frontend/uploads/
+
+# IDE caches (preserve shared settings.json, ignore user workspace state)
+.vscode/*
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store

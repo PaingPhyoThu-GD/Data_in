@@ -1,0 +1,134 @@
+/* Custom styling & Typography for Myanmar-English OCR & Multi-Service UI */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Myanmar:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-myanmar: 'Noto Sans Myanmar', 'Pyidaungsu', 'Padauk', 'Myanmar3', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: #0b0f19;
+    color: #e2e8f0;
+}
+
+/* Myanmar text typography optimization */
+.myanmar-text {
+    font-family: var(--font-myanmar), var(--font-sans);
+    line-height: 1.85;
+    letter-spacing: 0.01em;
+}
+
+/* Drag & Drop Pulse */
+.dragover {
+    border-color: #6366f1 !important;
+    background-color: rgba(99, 102, 241, 0.12) !important;
+    transform: scale(1.008);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #111827;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4b5563;
+}
+
+/* Glassmorphism */
+.glass-panel {
+    background: rgba(17, 24, 39, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+    background: rgba(30, 41, 59, 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Telegram Chat Bubbles */
+.chat-bubble-user {
+    background: rgba(49, 46, 129, 0.35);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.chat-bubble-peer {
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.chat-service-divider {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Toast animation */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+.toast-animate {
+    animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Service Nav Active Indicator */
+.service-nav-btn.active {
+    background: #4f46e5;
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+}
+
+/* History Toggle Active Indicator */
+.history-btn-active {
+    background: #4f46e5 !important;
+    color: #ffffff !important;
+    border-color: #6366f1 !important;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4) !important;
+}
+
+/* YouTube Service Styles */
+.yt-video-card {
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.yt-video-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(239, 68, 68, 0.4);
+    box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.15);
+}
+
+.yt-banner-container {
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.yt-banner-overlay {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.2) 0%, rgba(15, 23, 42, 0.95) 100%);
+}
+
+.yt-duration-badge {
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+}
+
