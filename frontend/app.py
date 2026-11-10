@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,6 +25,7 @@ from telegram_parser import TelegramHTMLParser, TelegramChatConverter
 from database_parser import DatabaseParser
 from youtube_parser import YouTubeChannelParser
 from survey_extractor import GoogleFormsCSVParser
+from telemetry import TelemetryService, VercelSyncRequest
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("gemini_ocr_frontend")
@@ -679,6 +680,225 @@ async def get_survey_history(limit: int = 30) -> list[dict[str, Any]]:
                         continue
     except Exception as exc:
         logger.error(f"Failed to read survey history logs: {exc}")
+        return []
+
+    records.reverse()
+    return records[:limit]
+
+
+# =============================================================================
+# Telemetry & Traffic Intelligence (Module 6) Endpoints
+# =============================================================================
+TELEMETRY_LOG_FILE = DEFAULT_LOG_DIR / "telemetry_parser_log.jsonl"
+TELEMETRY_DB_FILE = DEFAULT_LOG_DIR / "telemetry.db"
+SAMPLE_TELEMETRY_NDJSON = BASE_DIR.parent / "sample_telemetry" / "vercel_logs_sample.ndjson"
+SAMPLE_TELEMETRY_JSON = BASE_DIR.parent / "sample_telemetry" / "telemetry_sample.json"
+
+telemetry_service = TelemetryService(db_path=TELEMETRY_DB_FILE)
+
+
+@app.post("/api/telemetry/parse")
+@app.post("/api/telemetry/import")
+async def import_telemetry_file(
+    file: UploadFile = File(...),
+    site_id: Optional[str] = Form("default"),
+) -> JSONResponse:
+    """
+    Pathway B: Upload NDJSON, CSV, or JSON access/traffic log file.
+    Parses, sanitizes PII (IP truncation & daily-salted HMAC), inserts into SQLite WAL,
+    and returns complete analytical rollups with p50/p95 latencies and route metrics.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file selected.")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in (".ndjson", ".json", ".csv", ".log", ".txt"):
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported format. Please upload .ndjson, .csv, .json, or .log files.",
+        )
+
+    try:
+        content_bytes = await file.read()
+        payload = telemetry_service.ingest_file(content_bytes, site_id=site_id or "default")
+        payload.source_name = file.filename
+        payload_dict = payload.model_dump()
+
+        # Write audit log to telemetry_parser_log.jsonl
+        log_entry = {
+            "session_id": payload.session_id,
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "source": file.filename,
+            "site_id": payload.site_id,
+            "total_records": payload.total_records,
+            "kpis": payload_dict["kpis"],
+            "data": payload_dict,
+        }
+
+        try:
+            DEFAULT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+            with open(TELEMETRY_LOG_FILE, "a", encoding="utf-8") as lf:
+                lf.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        except Exception as log_err:
+            logger.warning(f"Could not write to telemetry_parser_log.jsonl: {log_err}")
+
+        return JSONResponse(payload_dict)
+
+    except ValueError as val_err:
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(val_err)})
+    except Exception as exc:
+        logger.error(f"Error parsing telemetry log: {exc}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(exc)})
+
+
+@app.post("/api/telemetry/sample")
+async def get_telemetry_sample() -> JSONResponse:
+    """
+    1-Click test endpoint loading bundled sample Vercel telemetry log data.
+    """
+    if not SAMPLE_TELEMETRY_NDJSON.exists():
+        raise HTTPException(status_code=404, detail="sample_telemetry/vercel_logs_sample.ndjson not found.")
+
+    try:
+        payload = telemetry_service.ingest_file(SAMPLE_TELEMETRY_NDJSON, site_id="vercel_sample")
+        payload.source_name = "vercel_logs_sample.ndjson"
+        return JSONResponse(payload.model_dump())
+    except Exception as exc:
+        logger.error(f"Error loading sample telemetry: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/telemetry/sync/vercel")
+async def sync_vercel_api(req: VercelSyncRequest) -> JSONResponse:
+    """
+    Pathway A: Direct Vercel REST Web Analytics synchronization.
+    Pulls live aggregate metrics using Vercel token and project ID.
+    """
+    try:
+        payload = telemetry_service.ingest_vercel_api(req)
+        payload_dict = payload.model_dump()
+
+        log_entry = {
+            "session_id": payload.session_id,
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "source": f"Vercel API ({req.project_id})",
+            "site_id": req.project_id,
+            "total_records": payload.total_records,
+            "kpis": payload_dict["kpis"],
+            "data": payload_dict,
+        }
+        with open(TELEMETRY_LOG_FILE, "a", encoding="utf-8") as lf:
+            lf.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+        return JSONResponse(payload_dict)
+    except Exception as exc:
+        logger.error(f"Vercel sync error: {exc}", exc_info=True)
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(exc)})
+
+
+@app.post("/api/telemetry/drain")
+async def receive_log_drain(
+    request: Request,
+    x_vercel_verify: Optional[str] = Header(None),
+    x_vercel_signature: Optional[str] = Header(None),
+) -> JSONResponse:
+    """
+    Pathway C: Real-time webhook receiver for Vercel Log Drains.
+    Handles verification handshake and ingests streaming NDJSON/JSON batches.
+    """
+    if x_vercel_verify:
+        # Vercel registration verification handshake
+        return JSONResponse(
+            status_code=200,
+            content={"status": "verified"},
+            headers={"x-vercel-verify": x_vercel_verify},
+        )
+
+    try:
+        body = await request.body()
+        payload = telemetry_service.ingest_drain(body, signature=x_vercel_signature)
+        return JSONResponse({"status": "success", "ingested_count": payload.total_records})
+    except PermissionError as perm_err:
+        raise HTTPException(status_code=401, detail=str(perm_err))
+    except Exception as exc:
+        logger.error(f"Log drain ingestion error: {exc}", exc_info=True)
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(exc)})
+
+
+@app.post("/api/telemetry/collect")
+async def collect_client_beacon(request: Request) -> JSONResponse:
+    """
+    Pathway D: Endpoint receiving lightweight navigator.sendBeacon pings from telemetry.js.
+    """
+    try:
+        raw_body = await request.body()
+        if not raw_body:
+            return JSONResponse({"status": "ignored", "reason": "empty body"})
+
+        try:
+            ping_data = json.loads(raw_body.decode("utf-8"))
+        except Exception:
+            ping_data = {}
+
+        from telemetry import BeaconPing
+        ping = BeaconPing(**ping_data) if ping_data else BeaconPing()
+        client_ip = request.client.host if request.client else "127.0.0.1"
+        user_agent = request.headers.get("user-agent", "Mozilla/5.0")
+
+        event = telemetry_service.ingest_beacon(
+            ping=ping,
+            client_ip=client_ip,
+            user_agent=user_agent,
+        )
+        return JSONResponse({"status": "ok", "event_id": event.id})
+    except Exception as exc:
+        logger.error(f"Beacon error: {exc}")
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(exc)})
+
+
+@app.get("/api/telemetry/stats")
+async def get_telemetry_stats(
+    site_id: Optional[str] = None,
+    start_time: Optional[int] = None,
+    end_time: Optional[int] = None,
+    limit: int = 150,
+) -> JSONResponse:
+    """
+    Query telemetry metrics, KPIs, breakdowns, and events for dashboard display.
+    """
+    try:
+        payload = telemetry_service.get_dashboard(
+            site_id=site_id,
+            start_time=start_time,
+            end_time=end_time,
+            limit_events=limit,
+        )
+        return JSONResponse(payload.model_dump())
+    except Exception as exc:
+        logger.error(f"Telemetry stats query error: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/telemetry/history")
+async def get_telemetry_history(limit: int = 30) -> list[dict[str, Any]]:
+    """
+    Read and return past telemetry ingestion audit logs from logs/telemetry_parser_log.jsonl.
+    """
+    if not TELEMETRY_LOG_FILE.exists():
+        return []
+    records = []
+    try:
+        with open(TELEMETRY_LOG_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        record = json.loads(line)
+                        records.append(record)
+                    except json.JSONDecodeError:
+                        continue
+    except Exception as exc:
+        logger.error(f"Failed to read telemetry history logs: {exc}")
         return []
 
     records.reverse()
