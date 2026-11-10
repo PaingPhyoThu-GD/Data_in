@@ -20,7 +20,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Start Gemini Myanmar-English OCR Web Frontend.")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host interface (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000)")
-    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+    parser.add_argument("--reload", action="store_true", default=True, help="Enable auto-reload for development (default: True)")
+    parser.add_argument("--no-reload", dest="reload", action="store_false", help="Disable auto-reload")
     parser.add_argument("--no-browser", action="store_true", help="Do not open browser automatically")
     args = parser.parse_args()
 

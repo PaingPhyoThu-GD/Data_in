@@ -24,6 +24,7 @@ from gemini_ocr.config import DEFAULT_BATCH_SIZE, DEFAULT_OCR_PROMPT, DEFAULT_LO
 from telegram_parser import TelegramHTMLParser, TelegramChatConverter
 from database_parser import DatabaseParser
 from youtube_parser import YouTubeChannelParser
+from survey_extractor import GoogleFormsCSVParser
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("gemini_ocr_frontend")
@@ -569,6 +570,120 @@ async def get_youtube_history(limit: int = 30) -> list[dict[str, Any]]:
 
     records.reverse()
     return records[:limit]
+
+
+# =============================================================================
+# Survey Extractor (Google Forms CSV to JSON) Endpoints - Pure In-Memory
+# =============================================================================
+SURVEY_LOG_FILE = DEFAULT_LOG_DIR / "survey_extractor_log.jsonl"
+SAMPLE_SURVEY_CSV = BASE_DIR.parent / "sample_surveys" / "google_forms_sample.csv"
+SAMPLE_SURVEY_JSON = BASE_DIR.parent / "sample_surveys" / "google_forms_sample.json"
+
+
+@app.post("/api/surveys/extract")
+@app.post("/api/surveys/import")
+async def extract_survey_csv(
+    file: UploadFile = File(...),
+    survey_title: Optional[str] = Form(None),
+) -> JSONResponse:
+    """
+    Extract Google Forms CSV export directly into structured JSON.
+    Pure in-memory extraction: parses dynamic questions, splits multi-select
+    strings into clean arrays, and returns complete structured payload without database storage.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file selected.")
+
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files (.csv) are supported for survey extraction.")
+
+    try:
+        content_bytes = await file.read()
+        parser_engine = GoogleFormsCSVParser()
+        result = parser_engine.parse_bytes(
+            content_bytes=content_bytes,
+            file_name=file.filename,
+            survey_title=survey_title,
+        )
+
+        result_dict = result.model_dump()
+
+        # Audit log to survey_extractor_log.jsonl for UI history viewer
+        log_entry = {
+            "survey_id": result.survey_id,
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "title": result.metadata.title,
+            "file_name": result.metadata.file_name,
+            "total_questions": result.metadata.total_questions,
+            "total_responses": result.metadata.total_responses,
+            "valid_responses": result.metadata.valid_responses,
+            "invalid_responses": result.metadata.invalid_responses,
+            "data": result_dict,
+        }
+
+        try:
+            DEFAULT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+            with open(SURVEY_LOG_FILE, "a", encoding="utf-8") as lf:
+                lf.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        except Exception as log_err:
+            logger.warning(f"Could not write to survey_extractor_log.jsonl: {log_err}")
+
+        return JSONResponse(result_dict)
+
+    except ValueError as val_err:
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(val_err)})
+    except Exception as exc:
+        logger.error(f"Error extracting survey CSV: {exc}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(exc)},
+        )
+
+
+@app.post("/api/surveys/sample")
+async def get_survey_sample() -> JSONResponse:
+    """
+    Returns the bundled sample Google Forms extracted survey data for immediate 1-click test.
+    """
+    if not SAMPLE_SURVEY_CSV.exists():
+        raise HTTPException(status_code=404, detail="google_forms_sample.csv not found.")
+
+    try:
+        parser_engine = GoogleFormsCSVParser()
+        result = parser_engine.parse_file(
+            file_path=SAMPLE_SURVEY_CSV,
+            survey_title="Developer Experience Survey (Sample)",
+        )
+        return JSONResponse(result.model_dump())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/surveys/history")
+async def get_survey_history(limit: int = 30) -> list[dict[str, Any]]:
+    """
+    Read and return past survey extraction logs from logs/survey_extractor_log.jsonl.
+    """
+    if not SURVEY_LOG_FILE.exists():
+        return []
+    records = []
+    try:
+        with open(SURVEY_LOG_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        record = json.loads(line)
+                        records.append(record)
+                    except json.JSONDecodeError:
+                        continue
+    except Exception as exc:
+        logger.error(f"Failed to read survey history logs: {exc}")
+        return []
+
+    records.reverse()
+    return records[:limit]
+
 
 
 

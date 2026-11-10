@@ -1,0 +1,357 @@
+{
+  "status": "success",
+  "survey_id": "srv_f73a814e4f",
+  "metadata": {
+    "survey_id": "srv_f73a814e4f",
+    "title": "google_forms_sample",
+    "file_name": "google_forms_sample.csv",
+    "created_at": "2026-11-10T03:31:04.557772+00:00",
+    "total_questions": 8,
+    "total_responses": 6,
+    "valid_responses": 6,
+    "invalid_responses": 0
+  },
+  "questions": [
+    {
+      "question_id": "q_0",
+      "column_index": 0,
+      "question_text": "Timestamp",
+      "field_type": "timestamp",
+      "detected_options": [],
+      "sample_values": [
+        "2024/05/10 9:15:32 AM",
+        "2024/05/10 9:22:45 AM",
+        "2024/05/10 10:05:12 AM"
+      ]
+    },
+    {
+      "question_id": "q_1",
+      "column_index": 1,
+      "question_text": "Email Address",
+      "field_type": "email",
+      "detected_options": [],
+      "sample_values": [
+        "alex.turner@example.com",
+        "sarah.lin@enterprise.org",
+        "michael.b@techlabs.io"
+      ]
+    },
+    {
+      "question_id": "q_2",
+      "column_index": 2,
+      "question_text": "Full Name",
+      "field_type": "text",
+      "detected_options": [],
+      "sample_values": [
+        "Alex Turner",
+        "Sarah Lin",
+        "Michael Brown"
+      ]
+    },
+    {
+      "question_id": "q_3",
+      "column_index": 3,
+      "question_text": "What is your current role?",
+      "field_type": "text",
+      "detected_options": [],
+      "sample_values": [
+        "Backend Engineer",
+        "Data Scientist",
+        "Full Stack Developer"
+      ]
+    },
+    {
+      "question_id": "q_4",
+      "column_index": 4,
+      "question_text": "Which programming languages do you use regularly?",
+      "field_type": "multi_select",
+      "detected_options": [
+        "Bash",
+        "C++",
+        "Go",
+        "HTML/CSS",
+        "JavaScript",
+        "Julia",
+        "Python",
+        "R",
+        "SQL",
+        "TypeScript"
+      ],
+      "sample_values": [
+        "Python, TypeScript, Go",
+        "Python, SQL, R",
+        "JavaScript, TypeScript, Python, HTML/CSS"
+      ]
+    },
+    {
+      "question_id": "q_5",
+      "column_index": 5,
+      "question_text": "Rate your experience with AI tools (1-10)",
+      "field_type": "number",
+      "detected_options": [],
+      "sample_values": [
+        "9",
+        "10",
+        "8"
+      ]
+    },
+    {
+      "question_id": "q_6",
+      "column_index": 6,
+      "question_text": "Would you recommend this platform to peers?",
+      "field_type": "boolean",
+      "detected_options": [],
+      "sample_values": [
+        "Yes",
+        "Yes",
+        "Yes"
+      ]
+    },
+    {
+      "question_id": "q_7",
+      "column_index": 7,
+      "question_text": "Additional comments or feature requests",
+      "field_type": "text",
+      "detected_options": [],
+      "sample_values": [
+        "Need deeper integration with PostgreSQL schemas.",
+        "Loved the automatic type inference!",
+        "Multi-select parsing works seamlessly."
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "response_id": "resp_9620c34b7194",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 2,
+      "submitted_at": "2024-05-10T09:15:32",
+      "email": "alex.turner@example.com",
+      "answers": {
+        "q_0": "2024-05-10T09:15:32",
+        "q_1": "alex.turner@example.com",
+        "q_2": "Alex Turner",
+        "q_3": "Backend Engineer",
+        "q_4": [
+          "Python",
+          "TypeScript",
+          "Go"
+        ],
+        "q_5": 9,
+        "q_6": true,
+        "q_7": "Need deeper integration with PostgreSQL schemas."
+      }
+    },
+    {
+      "response_id": "resp_a044d9e159dd",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 3,
+      "submitted_at": "2024-05-10T09:22:45",
+      "email": "sarah.lin@enterprise.org",
+      "answers": {
+        "q_0": "2024-05-10T09:22:45",
+        "q_1": "sarah.lin@enterprise.org",
+        "q_2": "Sarah Lin",
+        "q_3": "Data Scientist",
+        "q_4": [
+          "Python",
+          "SQL",
+          "R"
+        ],
+        "q_5": 10,
+        "q_6": true,
+        "q_7": "Loved the automatic type inference!"
+      }
+    },
+    {
+      "response_id": "resp_69720347e1c7",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 4,
+      "submitted_at": "2024-05-10T10:05:12",
+      "email": "michael.b@techlabs.io",
+      "answers": {
+        "q_0": "2024-05-10T10:05:12",
+        "q_1": "michael.b@techlabs.io",
+        "q_2": "Michael Brown",
+        "q_3": "Full Stack Developer",
+        "q_4": [
+          "JavaScript",
+          "TypeScript",
+          "Python",
+          "HTML/CSS"
+        ],
+        "q_5": 8,
+        "q_6": true,
+        "q_7": "Multi-select parsing works seamlessly."
+      }
+    },
+    {
+      "response_id": "resp_a1be89f496c6",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 5,
+      "submitted_at": "2024-05-10T11:30:00",
+      "email": "elena.rostova@cloudscale.net",
+      "answers": {
+        "q_0": "2024-05-10T11:30:00",
+        "q_1": "elena.rostova@cloudscale.net",
+        "q_2": "Elena Rostova",
+        "q_3": "DevOps Specialist",
+        "q_4": [
+          "Go",
+          "Bash",
+          "Python"
+        ],
+        "q_5": 7,
+        "q_6": true,
+        "q_7": "Please provide bulk JSON export."
+      }
+    },
+    {
+      "response_id": "resp_ce4970614716",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 6,
+      "submitted_at": "2024-05-10T13:45:19",
+      "email": "david.kim@startup.co",
+      "answers": {
+        "q_0": "2024-05-10T13:45:19",
+        "q_1": "david.kim@startup.co",
+        "q_2": "David Kim",
+        "q_3": "Product Manager",
+        "q_4": [
+          "SQL"
+        ],
+        "q_5": 9,
+        "q_6": true,
+        "q_7": "Great UI and fast processing."
+      }
+    },
+    {
+      "response_id": "resp_76214ba52e87",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 7,
+      "submitted_at": "2024-05-10T15:10:44",
+      "email": "priya.patel@globaltech.com",
+      "answers": {
+        "q_0": "2024-05-10T15:10:44",
+        "q_1": "priya.patel@globaltech.com",
+        "q_2": "Priya Patel",
+        "q_3": "AI Researcher",
+        "q_4": [
+          "Python",
+          "C++",
+          "Julia"
+        ],
+        "q_5": 10,
+        "q_6": true,
+        "q_7": "Excellent handling of dynamic questions."
+      }
+    }
+  ],
+  "sample_responses": [
+    {
+      "response_id": "resp_9620c34b7194",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 2,
+      "submitted_at": "2024-05-10T09:15:32",
+      "email": "alex.turner@example.com",
+      "answers": {
+        "q_0": "2024-05-10T09:15:32",
+        "q_1": "alex.turner@example.com",
+        "q_2": "Alex Turner",
+        "q_3": "Backend Engineer",
+        "q_4": [
+          "Python",
+          "TypeScript",
+          "Go"
+        ],
+        "q_5": 9,
+        "q_6": true,
+        "q_7": "Need deeper integration with PostgreSQL schemas."
+      }
+    },
+    {
+      "response_id": "resp_a044d9e159dd",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 3,
+      "submitted_at": "2024-05-10T09:22:45",
+      "email": "sarah.lin@enterprise.org",
+      "answers": {
+        "q_0": "2024-05-10T09:22:45",
+        "q_1": "sarah.lin@enterprise.org",
+        "q_2": "Sarah Lin",
+        "q_3": "Data Scientist",
+        "q_4": [
+          "Python",
+          "SQL",
+          "R"
+        ],
+        "q_5": 10,
+        "q_6": true,
+        "q_7": "Loved the automatic type inference!"
+      }
+    },
+    {
+      "response_id": "resp_69720347e1c7",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 4,
+      "submitted_at": "2024-05-10T10:05:12",
+      "email": "michael.b@techlabs.io",
+      "answers": {
+        "q_0": "2024-05-10T10:05:12",
+        "q_1": "michael.b@techlabs.io",
+        "q_2": "Michael Brown",
+        "q_3": "Full Stack Developer",
+        "q_4": [
+          "JavaScript",
+          "TypeScript",
+          "Python",
+          "HTML/CSS"
+        ],
+        "q_5": 8,
+        "q_6": true,
+        "q_7": "Multi-select parsing works seamlessly."
+      }
+    },
+    {
+      "response_id": "resp_a1be89f496c6",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 5,
+      "submitted_at": "2024-05-10T11:30:00",
+      "email": "elena.rostova@cloudscale.net",
+      "answers": {
+        "q_0": "2024-05-10T11:30:00",
+        "q_1": "elena.rostova@cloudscale.net",
+        "q_2": "Elena Rostova",
+        "q_3": "DevOps Specialist",
+        "q_4": [
+          "Go",
+          "Bash",
+          "Python"
+        ],
+        "q_5": 7,
+        "q_6": true,
+        "q_7": "Please provide bulk JSON export."
+      }
+    },
+    {
+      "response_id": "resp_ce4970614716",
+      "survey_id": "srv_f73a814e4f",
+      "row_number": 6,
+      "submitted_at": "2024-05-10T13:45:19",
+      "email": "david.kim@startup.co",
+      "answers": {
+        "q_0": "2024-05-10T13:45:19",
+        "q_1": "david.kim@startup.co",
+        "q_2": "David Kim",
+        "q_3": "Product Manager",
+        "q_4": [
+          "SQL"
+        ],
+        "q_5": 9,
+        "q_6": true,
+        "q_7": "Great UI and fast processing."
+      }
+    }
+  ],
+  "errors": []
+}

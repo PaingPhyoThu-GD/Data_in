@@ -67,6 +67,10 @@
                     <i data-lucide="youtube" class="w-4 h-4 text-red-500"></i>
                     <span>YouTube to JSON</span>
                 </button>
+                <button type="button" id="tabSurvey" class="service-nav-btn text-slate-400 hover:text-slate-200 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition duration-150">
+                    <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Survey to JSON</span>
+                </button>
             </div>
 
             <!-- Right Status / History Actions -->
@@ -883,6 +887,208 @@
                     </button>
                 </div>
                 <div id="ytHistoryListContainer" class="flex flex-col gap-3">
+                    <p class="text-xs text-slate-500 text-center py-6">Loading history...</p>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- SERVICE 5: SURVEY DATA TO JSON EXTRACTOR VIEW (PERPLEXITY UI)   -->
+        <!-- ============================================================== -->
+        <div id="viewSurvey" class="hidden flex flex-col gap-8">
+
+            <!-- Ingestion & Controls Card (Rounded-[32px], Font-Black, High-End Minimalist) -->
+            <section class="survey-perplexity-container rounded-[32px] p-8 sm:p-10 shadow-2xl">
+                <div class="flex items-center justify-between pb-6 border-b border-white/10 flex-wrap gap-4">
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <span class="p-2 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                            </span>
+                            <h2 class="text-2xl font-black tracking-tight text-white">
+                                Google Forms Survey Extractor
+                            </h2>
+                        </div>
+                        <p class="text-sm text-slate-400 mt-2 max-w-2xl">
+                            Pure in-memory extraction of exported Google Forms CSV data. Dynamically identifies question headers, type-casts responses, and splits multi-select checkbox strings into clean JSON arrays with zero storage overhead.
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button type="button" id="btnLoadSampleSurvey" class="px-4 py-2.5 rounded-2xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-2 transition-all hover:scale-[1.02]">
+                            <i data-lucide="file-check" class="w-4 h-4"></i>
+                            <span>Load Sample Survey</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input Controls -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+                    <!-- Drop Zone (2 cols) -->
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Upload Google Forms CSV</label>
+                        <div id="surveyDropzone" class="border-2 border-dashed border-white/15 hover:border-emerald-500/50 rounded-[28px] p-8 text-center cursor-pointer transition-all duration-300 bg-slate-950/40 hover:bg-emerald-950/10 flex flex-col items-center justify-center gap-3">
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                                <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                            </div>
+                            <div class="flex flex-col items-center gap-1">
+                                <p class="text-sm font-semibold text-slate-200">
+                                    Drop exported Google Forms <code class="text-emerald-400 font-mono">.csv</code> here, or <span class="text-emerald-400 underline">browse</span>
+                                </p>
+                                <p class="text-xs text-slate-500" id="surveyFileLabel">Accepts standard Google Forms response exports (UTF-8 / RFC 4180)</p>
+                            </div>
+                            <input type="file" id="surveyFileInput" accept=".csv" class="hidden">
+                        </div>
+                    </div>
+
+                    <!-- Custom Title & Trigger (1 col) -->
+                    <div class="flex flex-col justify-between gap-4">
+                        <div>
+                            <label for="surveyTitleInput" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Survey Title (Optional)</label>
+                            <input type="text" id="surveyTitleInput" placeholder="e.g. Developer Experience Survey" class="w-full text-xs bg-slate-950/60 border border-white/10 rounded-2xl px-4 py-3 text-slate-200 focus:outline-none focus:border-emerald-500 transition">
+                            <p class="text-[11px] text-slate-500 mt-2">Defaults to CSV filename if left blank.</p>
+                        </div>
+
+                        <button type="button" id="btnExtractSurvey" class="w-full py-3.5 px-5 rounded-2xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all duration-200 hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i data-lucide="zap" class="w-4 h-4"></i>
+                            <span id="btnExtractSurveyLabel">Extract to Structured JSON</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Survey Extraction Results Section -->
+            <section id="surveyResultSection" class="hidden flex flex-col gap-6">
+
+                <!-- Metadata Overview Banner -->
+                <div class="survey-perplexity-container rounded-[32px] p-8 shadow-xl">
+                    <div class="flex items-center justify-between flex-wrap gap-4 pb-6 border-b border-white/10">
+                        <div>
+                            <span class="text-xs font-bold text-emerald-400 tracking-wider uppercase font-mono">Extracted Survey Dataset</span>
+                            <h3 id="surveyResultTitle" class="text-2xl font-black tracking-tight text-white mt-1"></h3>
+                            <p id="surveyFileMeta" class="text-xs text-slate-400 mt-1 font-mono"></p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span id="surveyStatusBadge" class="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                Extracted (Pure In-Memory)
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Metric Stats Grid -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6">
+                        <div class="glass-card rounded-[24px] p-5 border border-white/5">
+                            <span class="text-xs text-slate-400 font-medium">Total Questions</span>
+                            <h4 id="surveyTotalQuestions" class="text-2xl font-black text-white mt-1 font-mono">0</h4>
+                        </div>
+                        <div class="glass-card rounded-[24px] p-5 border border-white/5">
+                            <span class="text-xs text-slate-400 font-medium">Total Responses</span>
+                            <h4 id="surveyTotalResponses" class="text-2xl font-black text-white mt-1 font-mono">0</h4>
+                        </div>
+                        <div class="glass-card rounded-[24px] p-5 border border-white/5">
+                            <span class="text-xs text-slate-400 font-medium">Valid Responses</span>
+                            <h4 id="surveyValidResponses" class="text-2xl font-black text-emerald-400 mt-1 font-mono">0</h4>
+                        </div>
+                        <div class="glass-card rounded-[24px] p-5 border border-white/5">
+                            <span class="text-xs text-slate-400 font-medium">Multi-Select Questions</span>
+                            <h4 id="surveyMultiSelectCount" class="text-2xl font-black text-indigo-400 mt-1 font-mono">0</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Question Schema Mapping Card -->
+                <div class="survey-perplexity-container rounded-[32px] p-8 shadow-xl">
+                    <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-6">
+                        <div class="flex items-center gap-2.5">
+                            <i data-lucide="layers" class="w-5 h-5 text-emerald-400"></i>
+                            <h4 class="font-black text-base text-white">Dynamic Question Schema Mapping</h4>
+                        </div>
+                        <span class="text-xs text-slate-400 font-mono">Inferred from Row 1 & Data Types</span>
+                    </div>
+
+                    <div id="surveyQuestionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+
+                <!-- Responses Table & Explorer Card -->
+                <div class="survey-perplexity-container rounded-[32px] p-8 shadow-xl">
+                    <!-- Toolbar -->
+                    <div class="flex items-center justify-between flex-wrap gap-4 pb-6 border-b border-white/10">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="table" class="w-5 h-5 text-emerald-400"></i>
+                            <h4 class="font-black text-base text-white">Extracted Responses Explorer</h4>
+                            <span id="surveyTableBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono font-medium">0 rows</span>
+                        </div>
+
+                        <!-- Actions & Filter -->
+                        <div class="flex items-center flex-wrap gap-2.5">
+                            <!-- Search -->
+                            <div class="relative">
+                                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                                <input type="text" id="surveySearchInput" placeholder="Search responses..." class="w-48 text-xs bg-slate-950/80 border border-white/10 rounded-xl pl-8 pr-3 py-2 text-slate-200 focus:outline-none focus:border-emerald-500 transition">
+                            </div>
+
+                            <!-- Copy & Download JSON -->
+                            <button id="btnCopySurveyJSON" class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                <span>Copy JSON</span>
+                            </button>
+
+                            <button id="btnDownloadSurveyJSON" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>Download JSON</span>
+                            </button>
+
+                            <button id="btnToggleSurveyRawJSON" class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition">
+                                <i data-lucide="code" class="w-3.5 h-3.5"></i>
+                                <span>Raw JSON</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Collapsible Raw JSON Container -->
+                    <div id="surveyRawJsonBox" class="hidden glass-panel rounded-2xl p-4 border border-white/10 my-4">
+                        <div class="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
+                            <span class="text-xs font-mono text-slate-400">Exported Structured Survey JSON Payload</span>
+                            <button id="btnCopyRawSurveyJSON" class="text-xs text-emerald-400 hover:text-emerald-300">Copy JSON</button>
+                        </div>
+                        <pre id="surveyRawJsonContent" class="text-[11px] font-mono text-emerald-400/90 overflow-x-auto p-3 bg-slate-950 rounded-xl max-h-72"></pre>
+                    </div>
+
+                    <!-- Table Preview Container -->
+                    <div id="surveyTableContainer" class="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/60 max-h-[550px] overflow-y-auto mt-6">
+                        <!-- Dynamic Table Rendered by JS -->
+                    </div>
+
+                    <!-- Pagination -->
+                    <div id="surveyPaginationContainer" class="flex items-center justify-between text-xs text-slate-400 pt-4 border-t border-white/10 mt-4">
+                        <span id="surveyPaginationInfo">Showing 1 - 6 of 6 responses</span>
+                        <div class="flex items-center gap-2">
+                            <button id="btnSurveyPrevPage" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition">Previous</button>
+                            <span id="surveyPageIndicator" class="px-2 font-mono text-slate-400">1 / 1</span>
+                            <button id="btnSurveyNextPage" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition">Next</button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Survey History Section -->
+            <section id="surveyHistorySection" class="hidden survey-perplexity-container rounded-[32px] p-8 shadow-xl">
+                <div class="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="archive" class="w-5 h-5 text-emerald-400"></i>
+                        <h2 class="text-base font-bold text-white">Survey Extraction History</h2>
+                        <span class="text-xs text-slate-500 font-mono">(from logs/survey_extractor_log.jsonl)</span>
+                    </div>
+                    <button id="btnRefreshSurveyHistory" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                    </button>
+                </div>
+                <div id="surveyHistoryListContainer" class="flex flex-col gap-3">
                     <p class="text-xs text-slate-500 text-center py-6">Loading history...</p>
                 </div>
             </section>

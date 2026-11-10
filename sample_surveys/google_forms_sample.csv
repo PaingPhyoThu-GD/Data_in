@@ -1,0 +1,7 @@
+Timestamp,Email Address,Full Name,What is your current role?,Which programming languages do you use regularly?,Rate your experience with AI tools (1-10),Would you recommend this platform to peers?,Additional comments or feature requests
+2024/05/10 9:15:32 AM,alex.turner@example.com,Alex Turner,Backend Engineer,"Python, TypeScript, Go",9,Yes,Need deeper integration with PostgreSQL schemas.
+2024/05/10 9:22:45 AM,sarah.lin@enterprise.org,Sarah Lin,Data Scientist,"Python, SQL, R",10,Yes,Loved the automatic type inference!
+2024/05/10 10:05:12 AM,michael.b@techlabs.io,Michael Brown,Full Stack Developer,"JavaScript, TypeScript, Python, HTML/CSS",8,Yes,Multi-select parsing works seamlessly.
+2024/05/10 11:30:00 AM,elena.rostova@cloudscale.net,Elena Rostova,DevOps Specialist,"Go, Bash, Python",7,Yes,Please provide bulk JSON export.
+2024/05/10 1:45:19 PM,david.kim@startup.co,David Kim,Product Manager,"SQL",9,Yes,Great UI and fast processing.
+2024/05/10 3:10:44 PM,priya.patel@globaltech.com,Priya Patel,AI Researcher,"Python, C++, Julia",10,Yes,Excellent handling of dynamic questions.

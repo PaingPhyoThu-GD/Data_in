@@ -39,10 +39,12 @@ const tabOCR = document.getElementById("tabOCR");
 const tabTelegram = document.getElementById("tabTelegram");
 const tabDatabase = document.getElementById("tabDatabase");
 const tabYouTube = document.getElementById("tabYouTube");
+const tabSurvey = document.getElementById("tabSurvey");
 const viewOCR = document.getElementById("viewOCR");
 const viewTelegram = document.getElementById("viewTelegram");
 const viewDatabase = document.getElementById("viewDatabase");
 const viewYouTube = document.getElementById("viewYouTube");
+const viewSurvey = document.getElementById("viewSurvey");
 const brandSubtitle = document.getElementById("brandSubtitle");
 const ocrStatusBadge = document.getElementById("ocrStatusBadge");
 const btnToggleHistory = document.getElementById("btnToggleHistory");
@@ -179,6 +181,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupTelegramEventListeners();
     setupDatabaseEventListeners();
     setupYouTubeEventListeners();
+    setupSurveyEventListeners();
 });
 
 // =============================================================================
@@ -189,6 +192,7 @@ function setupNavigation() {
     tabTelegram.addEventListener("click", () => switchService("telegram"));
     tabDatabase.addEventListener("click", () => switchService("database"));
     tabYouTube.addEventListener("click", () => switchService("youtube"));
+    if (tabSurvey) tabSurvey.addEventListener("click", () => switchService("survey"));
 
     // Unified dynamic history button
     btnToggleHistory.addEventListener("click", toggleActiveHistory);
@@ -199,11 +203,11 @@ function switchService(serviceName) {
     activeService = serviceName;
 
     // Reset all tabs
-    [tabOCR, tabTelegram, tabDatabase, tabYouTube].forEach(btn => {
+    [tabOCR, tabTelegram, tabDatabase, tabYouTube, tabSurvey].filter(Boolean).forEach(btn => {
         btn.classList.remove("active");
         btn.classList.add("text-slate-400");
     });
-    [viewOCR, viewTelegram, viewDatabase, viewYouTube].forEach(view => view.classList.add("hidden"));
+    [viewOCR, viewTelegram, viewDatabase, viewYouTube, viewSurvey].filter(Boolean).forEach(view => view.classList.add("hidden"));
 
     if (serviceName === "ocr") {
         tabOCR.classList.add("active");
@@ -242,6 +246,18 @@ function switchService(serviceName) {
         const ytHistSec = document.getElementById("ytHistorySection");
         updateHistoryBtnVisualState(ytHistSec && !ytHistSec.classList.contains("hidden"));
         brandSubtitle.textContent = "YouTube Channel Metadata & Video Catalog to Structured JSON";
+    } else if (serviceName === "survey") {
+        if (tabSurvey) {
+            tabSurvey.classList.add("active");
+            tabSurvey.classList.remove("text-slate-400");
+        }
+        if (viewSurvey) viewSurvey.classList.remove("hidden");
+
+        ocrStatusBadge.classList.add("hidden");
+        historyBtnLabel.textContent = "Survey History";
+        const surveyHistSec = document.getElementById("surveyHistorySection");
+        updateHistoryBtnVisualState(surveyHistSec && !surveyHistSec.classList.contains("hidden"));
+        brandSubtitle.textContent = "Google Forms CSV Survey Response to Structured JSON Extractor";
     }
     lucide.createIcons();
 }
@@ -280,6 +296,17 @@ function toggleActiveHistory() {
             if (isOpen) {
                 loadYtHistory();
                 ytHistSec.scrollIntoView({ behavior: "smooth" });
+            }
+        }
+    } else if (activeService === "survey") {
+        const surveyHistSec = document.getElementById("surveyHistorySection");
+        if (surveyHistSec) {
+            surveyHistSec.classList.toggle("hidden");
+            const isOpen = !surveyHistSec.classList.contains("hidden");
+            updateHistoryBtnVisualState(isOpen);
+            if (isOpen) {
+                loadSurveyHistory();
+                surveyHistSec.scrollIntoView({ behavior: "smooth" });
             }
         }
     }
@@ -2354,4 +2381,486 @@ function showToast(message, type = "info") {
         toast.style.transform = "translate(-50%, -10px)";
         setTimeout(() => toast.remove(), 250);
     }, 3200);
+}
+
+
+// =============================================================================
+// SERVICE 5: SURVEY DATA TO JSON EXTRACTOR (PERPLEXITY MINIMALIST UI)
+// =============================================================================
+let currentSurveyData = null;
+let surveySelectedFile = null;
+let surveyCurrentPage = 1;
+let surveyPageSize = 25;
+let surveySearchFilter = "";
+
+function setupSurveyEventListeners() {
+    const dropzone = document.getElementById("surveyDropzone");
+    const fileInput = document.getElementById("surveyFileInput");
+    const fileLabel = document.getElementById("surveyFileLabel");
+    const btnExtract = document.getElementById("btnExtractSurvey");
+    const btnLoadSample = document.getElementById("btnLoadSampleSurvey");
+    const searchInput = document.getElementById("surveySearchInput");
+    const btnCopyJSON = document.getElementById("btnCopySurveyJSON");
+    const btnDownloadJSON = document.getElementById("btnDownloadSurveyJSON");
+    const btnToggleRawJSON = document.getElementById("btnToggleSurveyRawJSON");
+    const btnCopyRawJSON = document.getElementById("btnCopyRawSurveyJSON");
+    const btnPrevPage = document.getElementById("btnSurveyPrevPage");
+    const btnNextPage = document.getElementById("btnSurveyNextPage");
+    const btnRefreshHistory = document.getElementById("btnRefreshSurveyHistory");
+
+    if (!dropzone || !fileInput) return;
+
+    // Dropzone click & drag/drop
+    dropzone.addEventListener("click", () => fileInput.click());
+
+    dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("dragover");
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleSurveyFileSelected(e.dataTransfer.files[0]);
+        }
+    });
+
+    fileInput.addEventListener("change", (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            handleSurveyFileSelected(e.target.files[0]);
+        }
+    });
+
+    function handleSurveyFileSelected(file) {
+        if (!file.name.toLowerCase().endsWith(".csv")) {
+            showToast("Please select a valid CSV file (.csv).", "warning");
+            return;
+        }
+        surveySelectedFile = file;
+        fileLabel.innerHTML = `<span class="text-emerald-400 font-semibold">${escapeHtml(file.name)}</span> (${formatFileSize(file.size)})`;
+        showToast(`Selected: ${file.name}`, "info");
+    }
+
+    // Extract Survey Trigger
+    if (btnExtract) {
+        btnExtract.addEventListener("click", async () => {
+            if (!surveySelectedFile) {
+                showToast("Please upload or drop a Google Forms CSV file first.", "warning");
+                return;
+            }
+
+            const titleInput = document.getElementById("surveyTitleInput");
+            const surveyTitle = titleInput ? titleInput.value.trim() : "";
+
+            const formData = new FormData();
+            formData.append("file", surveySelectedFile);
+            if (surveyTitle) {
+                formData.append("survey_title", surveyTitle);
+            }
+
+            const btnLabel = document.getElementById("btnExtractSurveyLabel");
+            btnExtract.disabled = true;
+            btnLabel.textContent = "Extracting CSV...";
+
+            try {
+                const response = await fetch("/api/surveys/extract", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.message || `Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                renderSurveyResult(data);
+                showToast(`Successfully extracted ${data.metadata.total_responses} responses!`, "success");
+            } catch (err) {
+                console.error("Survey extraction failed:", err);
+                showToast(`Extraction error: ${err.message}`, "error");
+            } finally {
+                btnExtract.disabled = false;
+                btnLabel.textContent = "Extract to Structured JSON";
+            }
+        });
+    }
+
+    // Load Sample Survey Trigger
+    if (btnLoadSample) {
+        btnLoadSample.addEventListener("click", async () => {
+            btnLoadSample.disabled = true;
+            try {
+                const response = await fetch("/api/surveys/sample", { method: "POST" });
+                if (!response.ok) {
+                    throw new Error(`Failed to load sample: ${response.status}`);
+                }
+                const data = await response.json();
+                renderSurveyResult(data);
+                showToast("Sample Google Forms survey loaded!", "success");
+            } catch (err) {
+                console.error("Failed to load sample survey:", err);
+                showToast(`Error: ${err.message}`, "error");
+            } finally {
+                btnLoadSample.disabled = false;
+            }
+        });
+    }
+
+    // Search filter
+    if (searchInput) {
+        searchInput.addEventListener("input", (e) => {
+            surveySearchFilter = e.target.value.toLowerCase().trim();
+            surveyCurrentPage = 1;
+            renderSurveyTableRows();
+        });
+    }
+
+    // Copy JSON
+    if (btnCopyJSON) {
+        btnCopyJSON.addEventListener("click", () => {
+            if (!currentSurveyData) return;
+            navigator.clipboard.writeText(JSON.stringify(currentSurveyData, null, 2))
+                .then(() => showToast("Survey JSON copied to clipboard!", "success"))
+                .catch(() => showToast("Failed to copy JSON.", "error"));
+        });
+    }
+
+    if (btnCopyRawJSON) {
+        btnCopyRawJSON.addEventListener("click", () => {
+            if (!currentSurveyData) return;
+            navigator.clipboard.writeText(JSON.stringify(currentSurveyData, null, 2))
+                .then(() => showToast("Survey JSON copied!", "success"));
+        });
+    }
+
+    // Download JSON
+    if (btnDownloadJSON) {
+        btnDownloadJSON.addEventListener("click", () => {
+            if (!currentSurveyData) return;
+            const filename = `${(currentSurveyData.metadata.title || "survey_export").replace(/\s+/g, "_")}.json`;
+            downloadTextFile(filename, JSON.stringify(currentSurveyData, null, 2));
+            showToast(`Downloaded: ${filename}`, "info");
+        });
+    }
+
+    // Toggle Raw JSON
+    if (btnToggleRawJSON) {
+        btnToggleRawJSON.addEventListener("click", () => {
+            const box = document.getElementById("surveyRawJsonBox");
+            if (box) {
+                box.classList.toggle("hidden");
+                lucide.createIcons();
+            }
+        });
+    }
+
+    // Pagination
+    if (btnPrevPage) {
+        btnPrevPage.addEventListener("click", () => {
+            if (surveyCurrentPage > 1) {
+                surveyCurrentPage--;
+                renderSurveyTableRows();
+            }
+        });
+    }
+
+    if (btnNextPage) {
+        btnNextPage.addEventListener("click", () => {
+            const filtered = getFilteredResponses();
+            const totalPages = Math.ceil(filtered.length / surveyPageSize) || 1;
+            if (surveyCurrentPage < totalPages) {
+                surveyCurrentPage++;
+                renderSurveyTableRows();
+            }
+        });
+    }
+
+    // History refresh
+    if (btnRefreshHistory) {
+        btnRefreshHistory.addEventListener("click", loadSurveyHistory);
+    }
+}
+
+function renderSurveyResult(data) {
+    currentSurveyData = data;
+    surveyCurrentPage = 1;
+
+    const resultSection = document.getElementById("surveyResultSection");
+    if (resultSection) resultSection.classList.remove("hidden");
+
+    // Overview Stats
+    const titleEl = document.getElementById("surveyResultTitle");
+    const metaEl = document.getElementById("surveyFileMeta");
+    const questionsEl = document.getElementById("surveyTotalQuestions");
+    const responsesEl = document.getElementById("surveyTotalResponses");
+    const validEl = document.getElementById("surveyValidResponses");
+    const multiCountEl = document.getElementById("surveyMultiSelectCount");
+
+    if (titleEl) titleEl.textContent = data.metadata.title || "Untitled Survey";
+    if (metaEl) {
+        metaEl.textContent = `File: ${data.metadata.file_name} • ID: ${data.survey_id} • Extracted: ${formatTime(data.metadata.created_at)}`;
+    }
+    if (questionsEl) questionsEl.textContent = data.metadata.total_questions;
+    if (responsesEl) responsesEl.textContent = data.metadata.total_responses;
+    if (validEl) validEl.textContent = data.metadata.valid_responses;
+
+    const multiQuestions = (data.questions || []).filter(q => q.field_type === "multi_select");
+    if (multiCountEl) multiCountEl.textContent = multiQuestions.length;
+
+    // Raw JSON Box
+    const rawJsonContent = document.getElementById("surveyRawJsonContent");
+    if (rawJsonContent) {
+        rawJsonContent.textContent = JSON.stringify(data, null, 2);
+    }
+
+    // Render Question Schema Cards
+    renderSurveyQuestions(data.questions || []);
+
+    // Render Table
+    renderSurveyTableRows();
+
+    // Scroll smoothly to results
+    if (resultSection) {
+        resultSection.scrollIntoView({ behavior: "smooth" });
+    }
+    lucide.createIcons();
+}
+
+function renderSurveyQuestions(questions) {
+    const grid = document.getElementById("surveyQuestionsGrid");
+    if (!grid) return;
+
+    if (!questions || questions.length === 0) {
+        grid.innerHTML = `<p class="text-xs text-slate-500">No questions detected.</p>`;
+        return;
+    }
+
+    const typeBadgeStyles = {
+        timestamp: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+        email: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+        multi_select: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+        number: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+        boolean: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+        text: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+    };
+
+    grid.innerHTML = questions.map((q, idx) => {
+        const badgeClass = typeBadgeStyles[q.field_type] || typeBadgeStyles.text;
+        const optionsHtml = (q.detected_options && q.detected_options.length > 0)
+            ? `<div class="mt-2.5 flex flex-wrap gap-1.5">
+                ${q.detected_options.map(opt => `<span class="survey-tag-pill px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono">${escapeHtml(opt)}</span>`).join("")}
+               </div>`
+            : "";
+
+        return `
+            <div class="glass-card rounded-[24px] p-5 border border-white/5 flex flex-col justify-between transition-all duration-200 hover:border-emerald-500/30">
+                <div>
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <span class="text-[10px] font-mono text-slate-500 font-bold">Col #${idx + 1} (${escapeHtml(q.question_id)})</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border font-mono ${badgeClass}">
+                            ${escapeHtml(q.field_type.replace('_', ' '))}
+                        </span>
+                    </div>
+                    <h5 class="text-sm font-bold text-white leading-snug">${escapeHtml(q.question_text)}</h5>
+                </div>
+                ${optionsHtml}
+            </div>
+        `;
+    }).join("");
+}
+
+function getFilteredResponses() {
+    if (!currentSurveyData || !currentSurveyData.responses) return [];
+    if (!surveySearchFilter) return currentSurveyData.responses;
+
+    return currentSurveyData.responses.filter(resp => {
+        if (resp.email && resp.email.toLowerCase().includes(surveySearchFilter)) return true;
+        if (resp.submitted_at && resp.submitted_at.toLowerCase().includes(surveySearchFilter)) return true;
+        for (const [qId, val] of Object.entries(resp.answers || {})) {
+            if (val === null || val === undefined) continue;
+            if (Array.isArray(val)) {
+                if (val.some(item => String(item).toLowerCase().includes(surveySearchFilter))) return true;
+            } else if (String(val).toLowerCase().includes(surveySearchFilter)) {
+                return true;
+            }
+        }
+        return false;
+    });
+}
+
+function renderSurveyTableRows() {
+    const tableContainer = document.getElementById("surveyTableContainer");
+    const badgeEl = document.getElementById("surveyTableBadge");
+    const paginationInfo = document.getElementById("surveyPaginationInfo");
+    const pageIndicator = document.getElementById("surveyPageIndicator");
+    const btnPrev = document.getElementById("btnSurveyPrevPage");
+    const btnNext = document.getElementById("btnSurveyNextPage");
+
+    if (!tableContainer || !currentSurveyData) return;
+
+    const questions = currentSurveyData.questions || [];
+    const filtered = getFilteredResponses();
+    const totalCount = filtered.length;
+
+    if (badgeEl) badgeEl.textContent = `${totalCount} rows`;
+
+    const totalPages = Math.ceil(totalCount / surveyPageSize) || 1;
+    if (surveyCurrentPage > totalPages) surveyCurrentPage = totalPages;
+    if (surveyCurrentPage < 1) surveyCurrentPage = 1;
+
+    const startIdx = (surveyCurrentPage - 1) * surveyPageSize;
+    const endIdx = Math.min(startIdx + surveyPageSize, totalCount);
+    const pageRows = filtered.slice(startIdx, endIdx);
+
+    if (paginationInfo) {
+        paginationInfo.textContent = totalCount > 0
+            ? `Showing ${startIdx + 1} - ${endIdx} of ${totalCount} responses`
+            : "No matching responses";
+    }
+    if (pageIndicator) pageIndicator.textContent = `${surveyCurrentPage} / ${totalPages}`;
+    if (btnPrev) btnPrev.disabled = surveyCurrentPage <= 1;
+    if (btnNext) btnNext.disabled = surveyCurrentPage >= totalPages;
+
+    if (pageRows.length === 0) {
+        tableContainer.innerHTML = `
+            <div class="text-center py-12 text-slate-500 text-xs">
+                <i data-lucide="search-x" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+                No survey responses match the filter query.
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    // Build Table
+    const headerCols = [
+        `<th class="px-4 py-3 text-left text-slate-400 font-mono text-[11px] font-bold uppercase tracking-wider sticky left-0 bg-slate-950 z-10 border-b border-white/10">#</th>`,
+        ...questions.map(q => `
+            <th class="px-4 py-3 text-left text-slate-300 text-xs font-bold tracking-tight border-b border-white/10 min-w-[180px]">
+                <div class="flex flex-col gap-0.5">
+                    <span>${escapeHtml(q.question_text)}</span>
+                    <span class="text-[10px] font-mono text-emerald-400/80 font-normal uppercase">${escapeHtml(q.field_type)}</span>
+                </div>
+            </th>
+        `)
+    ].join("");
+
+    const rowItems = pageRows.map(row => {
+        const rowCells = [
+            `<td class="px-4 py-3 text-[11px] font-mono text-slate-500 sticky left-0 bg-slate-950 z-10 border-b border-white/5">${row.row_number}</td>`,
+            ...questions.map(q => {
+                const val = (row.answers || {})[q.question_id];
+                return `<td class="px-4 py-3 text-xs text-slate-200 border-b border-white/5 align-top">${formatCellValue(val, q.field_type)}</td>`;
+            })
+        ].join("");
+
+        return `<tr class="survey-row transition-colors">${rowCells}</tr>`;
+    }).join("");
+
+    tableContainer.innerHTML = `
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-900/80">${headerCols}</tr>
+            </thead>
+            <tbody>
+                ${rowItems}
+            </tbody>
+        </table>
+    `;
+    lucide.createIcons();
+}
+
+function formatCellValue(val, fieldType) {
+    if (val === null || val === undefined || val === "") {
+        return `<span class="text-slate-600 font-mono italic">empty</span>`;
+    }
+
+    if (fieldType === "multi_select" && Array.isArray(val)) {
+        if (val.length === 0) return `<span class="text-slate-600 font-mono italic">none</span>`;
+        return `
+            <div class="flex flex-wrap gap-1">
+                ${val.map(item => `<span class="survey-tag-pill px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">${escapeHtml(String(item))}</span>`).join("")}
+            </div>
+        `;
+    }
+
+    if (fieldType === "boolean") {
+        return val === true
+            ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">TRUE</span>`
+            : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/50 text-slate-400 border border-slate-600">FALSE</span>`;
+    }
+
+    if (fieldType === "number") {
+        return `<span class="font-mono font-bold text-amber-300">${val}</span>`;
+    }
+
+    if (fieldType === "email") {
+        return `<span class="font-mono text-purple-300">${escapeHtml(String(val))}</span>`;
+    }
+
+    if (fieldType === "timestamp") {
+        return `<span class="font-mono text-blue-300 text-[11px]">${escapeHtml(String(val))}</span>`;
+    }
+
+    return `<span>${escapeHtml(String(val))}</span>`;
+}
+
+async function loadSurveyHistory() {
+    const listContainer = document.getElementById("surveyHistoryListContainer");
+    if (!listContainer) return;
+
+    listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">Loading past survey extractions...</p>`;
+
+    try {
+        const response = await fetch("/api/surveys/history?limit=20");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const records = await response.json();
+
+        if (!records || records.length === 0) {
+            listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">No survey extractions recorded in history yet.</p>`;
+            return;
+        }
+
+        listContainer.innerHTML = records.map(item => `
+            <div class="glass-card rounded-[24px] p-5 border border-white/5 flex items-center justify-between gap-4 transition hover:border-emerald-500/30">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                        <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-bold text-white">${escapeHtml(item.title || item.file_name)}</h4>
+                        <p class="text-xs text-slate-400 mt-0.5 font-mono">
+                            ${item.total_questions} questions • ${item.total_responses} responses • ${formatTime(item.timestamp)}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-load-survey-hist px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 transition" data-survey-id="${escapeHtml(item.survey_id)}">
+                        Load in Viewer
+                    </button>
+                </div>
+            </div>
+        `).join("");
+
+        // Attach load triggers
+        listContainer.querySelectorAll(".btn-load-survey-hist").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const sId = btn.getAttribute("data-survey-id");
+                const targetRecord = records.find(r => r.survey_id === sId);
+                if (targetRecord && targetRecord.data) {
+                    renderSurveyResult(targetRecord.data);
+                    showToast(`Loaded survey: ${targetRecord.title}`, "info");
+                }
+            });
+        });
+        lucide.createIcons();
+    } catch (err) {
+        listContainer.innerHTML = `<p class="text-xs text-rose-400 text-center py-6">Failed to load history: ${escapeHtml(err.message)}</p>`;
+    }
 }
