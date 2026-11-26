@@ -197,6 +197,8 @@ function setupNavigation() {
     tabYouTube.addEventListener("click", () => switchService("youtube"));
     if (tabSurvey) tabSurvey.addEventListener("click", () => switchService("survey"));
     if (tabTelemetry) tabTelemetry.addEventListener("click", () => switchService("telemetry"));
+    const tabDuckLake = document.getElementById("tabDuckLake");
+    if (tabDuckLake) tabDuckLake.addEventListener("click", () => switchService("ducklake"));
 
     // Unified dynamic history button
     btnToggleHistory.addEventListener("click", toggleActiveHistory);
@@ -206,12 +208,15 @@ function switchService(serviceName) {
     if (activeService === serviceName) return;
     activeService = serviceName;
 
+    const tabDuckLake = document.getElementById("tabDuckLake");
+    const viewDuckLake = document.getElementById("viewDuckLake");
+
     // Reset all tabs
-    [tabOCR, tabTelegram, tabDatabase, tabYouTube, tabSurvey, tabTelemetry].filter(Boolean).forEach(btn => {
+    [tabOCR, tabTelegram, tabDatabase, tabYouTube, tabSurvey, tabTelemetry, tabDuckLake].filter(Boolean).forEach(btn => {
         btn.classList.remove("active");
         btn.classList.add("text-slate-400");
     });
-    [viewOCR, viewTelegram, viewDatabase, viewYouTube, viewSurvey, viewTelemetry].filter(Boolean).forEach(view => view.classList.add("hidden"));
+    [viewOCR, viewTelegram, viewDatabase, viewYouTube, viewSurvey, viewTelemetry, viewDuckLake].filter(Boolean).forEach(view => view.classList.add("hidden"));
 
     if (serviceName === "ocr") {
         tabOCR.classList.add("active");
@@ -274,6 +279,23 @@ function switchService(serviceName) {
         const telemetryHistSec = document.getElementById("telemetryHistorySection");
         updateHistoryBtnVisualState(telemetryHistSec && !telemetryHistSec.classList.contains("hidden"));
         brandSubtitle.textContent = "Website & App Traffic Telemetry • Observability to JSON";
+    } else if (serviceName === "ducklake") {
+        const tabDuckLake = document.getElementById("tabDuckLake");
+        const viewDuckLake = document.getElementById("viewDuckLake");
+        if (tabDuckLake) {
+            tabDuckLake.classList.add("active");
+            tabDuckLake.classList.remove("text-slate-400");
+        }
+        if (viewDuckLake) viewDuckLake.classList.remove("hidden");
+
+        ocrStatusBadge.classList.add("hidden");
+        historyBtnLabel.textContent = "Pipeline Runs";
+        const dlHistSec = document.getElementById("ducklakeHistorySection");
+        updateHistoryBtnVisualState(dlHistSec && !dlHistSec.classList.contains("hidden"));
+        brandSubtitle.textContent = "DuckLake Medallion Pipeline • Bronze, Silver, Quality Gate & Gold Marts";
+        if (typeof window.initDuckLakeTab === "function") {
+            window.initDuckLakeTab();
+        }
     }
     lucide.createIcons();
 }
@@ -334,6 +356,17 @@ function toggleActiveHistory() {
             if (isOpen) {
                 loadTelemetryHistory();
                 telemetryHistSec.scrollIntoView({ behavior: "smooth" });
+            }
+        }
+    } else if (activeService === "ducklake") {
+        const dlHistSec = document.getElementById("ducklakeHistorySection");
+        if (dlHistSec) {
+            dlHistSec.classList.toggle("hidden");
+            const isOpen = !dlHistSec.classList.contains("hidden");
+            updateHistoryBtnVisualState(isOpen);
+            if (isOpen && typeof window.toggleDuckLakeHistory === "function") {
+                window.toggleDuckLakeHistory();
+                dlHistSec.scrollIntoView({ behavior: "smooth" });
             }
         }
     }

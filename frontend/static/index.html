@@ -35,7 +35,7 @@
 
     <!-- Header / Navigation -->
     <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-30">
-        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <div class="max-w-6xl mx-auto px-4 min-h-16 py-2 flex flex-wrap items-center justify-between gap-4">
             <!-- App Brand -->
             <div class="flex items-center gap-3">
                 <div id="brandIcon" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -50,7 +50,7 @@
             </div>
 
             <!-- Service Switcher (Segmented Control) -->
-            <div class="bg-slate-950/80 p-1 rounded-xl border border-slate-800 flex items-center gap-1 shadow-inner">
+            <div class="bg-slate-950/80 p-1 rounded-xl border border-slate-800 flex flex-wrap items-center gap-1 shadow-inner">
                 <button type="button" id="tabOCR" class="service-nav-btn active flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition duration-150">
                     <i data-lucide="scan-text" class="w-4 h-4"></i>
                     <span>Gemini OCR</span>
@@ -74,6 +74,10 @@
                 <button type="button" id="tabTelemetry" class="service-nav-btn text-slate-400 hover:text-slate-200 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition duration-150">
                     <i data-lucide="activity" class="w-4 h-4 text-amber-400"></i>
                     <span>Telemetry</span>
+                </button>
+                <button type="button" id="tabDuckLake" class="service-nav-btn text-slate-400 hover:text-slate-200 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition duration-150">
+                    <i data-lucide="layers" class="w-4 h-4 text-sky-400"></i>
+                    <span>DuckLake</span>
                 </button>
             </div>
 
@@ -1489,6 +1493,84 @@
 
         </div>
 
+        <!-- ============================================================== -->
+        <!-- SERVICE 7: DUCKLAKE MEDALLION PIPELINE VIEW                    -->
+        <!-- ============================================================== -->
+        <div id="viewDuckLake" class="hidden flex flex-col gap-8">
+            <section class="bg-slate-900/60 border border-slate-800 rounded-[32px] p-6 sm:p-8 flex flex-col gap-6">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-black text-white tracking-tight">DuckLake Medallion Lakehouse</h2>
+                        <p class="text-xs text-slate-400 mt-1">Parquet-backed Bronze &rarr; Silver &rarr; Quality Gate &rarr; Gold pipeline across all 6 services.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <span id="ducklakeStatusBadge" class="dl-badge-warn px-3 py-1 rounded-full text-xs font-bold">NOT RUN</span>
+                        <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                            <input type="checkbox" id="ducklakeFullRefreshCheck" class="rounded bg-slate-800 border-slate-700 text-sky-500">
+                            <span>Full Refresh</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                            <input type="checkbox" id="ducklakeExportCheck" class="rounded bg-slate-800 border-slate-700 text-sky-500">
+                            <span>Export .duckdb</span>
+                        </label>
+                        <button type="button" id="ducklakeRunBtn" class="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-sky-600/20 flex items-center gap-2 transition">
+                            <i data-lucide="play" class="w-4 h-4"></i>
+                            <span>Run Ingestion Batch</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="ducklakeLayerCards" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+            </section>
+
+            <!-- Gold Mart Explorer -->
+            <section class="bg-slate-900/60 border border-slate-800 rounded-[32px] p-6 sm:p-8 flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <h3 class="text-base font-black text-white">Gold Mart Preview</h3>
+                    <div class="flex items-center gap-3">
+                        <select id="ducklakeMartSelect" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200">
+                            <option value="gold_ingestion_overview">gold_ingestion_overview</option>
+                            <option value="gold_sales_kpi_mart">gold_sales_kpi_mart</option>
+                            <option value="gold_telegram_engagement_mart">gold_telegram_engagement_mart</option>
+                            <option value="gold_web_traffic_mart">gold_web_traffic_mart</option>
+                        </select>
+                        <button type="button" id="ducklakeMartPrev" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs text-slate-300 hover:text-white">Prev</button>
+                        <span id="ducklakeMartPageInfo" class="text-xs text-slate-400 font-mono">0 rows</span>
+                        <button type="button" id="ducklakeMartNext" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs text-slate-300 hover:text-white">Next</button>
+                    </div>
+                </div>
+                <div id="ducklakeMartTable" class="dl-table-wrap overflow-x-auto border border-slate-800 rounded-2xl"></div>
+            </section>
+
+            <!-- Quarantine Inspector -->
+            <section class="bg-slate-900/60 border border-slate-800 rounded-[32px] p-6 sm:p-8 flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <h3 class="text-base font-black text-white">Quality Gate &amp; Quarantine</h3>
+                    <select id="ducklakeQuarantineEntity" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200">
+                        <option value="">All Entities</option>
+                        <option value="ocr_extractions">ocr_extractions</option>
+                        <option value="telegram_messages">telegram_messages</option>
+                        <option value="sales_orders">sales_orders</option>
+                        <option value="youtube_channels">youtube_channels</option>
+                        <option value="youtube_videos">youtube_videos</option>
+                        <option value="survey_runs">survey_runs</option>
+                        <option value="telemetry_events">telemetry_events</option>
+                    </select>
+                </div>
+                <div id="ducklakeQuarantineTable" class="dl-table-wrap overflow-x-auto border border-slate-800 rounded-2xl"></div>
+            </section>
+
+            <!-- Pipeline Runs History Drawer -->
+            <section id="ducklakeHistorySection" class="hidden bg-slate-900/60 border border-slate-800 rounded-[32px] p-6 sm:p-8 flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-base font-black text-white">Ingestion Batches</h3>
+                    <button type="button" id="btnRefreshDuckLakeHistory" class="text-xs text-slate-400 hover:text-white flex items-center gap-1.5">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                    </button>
+                </div>
+                <div id="ducklakeHistoryList" class="flex flex-col gap-2"></div>
+            </section>
+        </div>
+
     </main>
 
     <!-- Global Image Zoom Modal -->
@@ -1505,5 +1587,6 @@
 
     <!-- App JavaScript -->
     <script src="/static/app.js"></script>
+    <script src="/static/lakehouse.js"></script>
 </body>
 </html>

@@ -26,6 +26,8 @@ from database_parser import DatabaseParser
 from youtube_parser import YouTubeChannelParser
 from survey_extractor import GoogleFormsCSVParser
 from telemetry import TelemetryService, VercelSyncRequest
+from ducklake import LakehouseConfig, LakehouseService
+from frontend.lakehouse_routes import router as lakehouse_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("gemini_ocr_frontend")
@@ -40,6 +42,9 @@ app = FastAPI(
     description="Clean Single-Page Web Frontend and Middleware for Gemini OCR",
     version="1.0.0",
 )
+
+app.state.lakehouse_service = LakehouseService(LakehouseConfig(project_root=BASE_DIR.parent))
+app.include_router(lakehouse_router)
 
 # Enable CORS for flexibility
 app.add_middleware(
