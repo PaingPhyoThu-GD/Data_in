@@ -36,3 +36,49 @@ def temp_image_dir(tmp_path: Path) -> Path:
 
     return img_dir
 
+
+@pytest.fixture(autouse=True)
+def isolated_frontend_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate FastAPI log/upload/DB targets into tmp_path when frontend.app is loaded."""
+    if "frontend.app" not in sys.modules:
+        return
+
+    import frontend.app as frontend_app
+    from gemini_ocr import OCRSystem as RealOCRSystem
+    from telemetry import TelemetryService
+
+    tmp_logs = tmp_path / "logs"
+    tmp_uploads = tmp_path / "uploads"
+    tmp_logs.mkdir(parents=True, exist_ok=True)
+    tmp_uploads.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(frontend_app, "DEFAULT_LOG_DIR", tmp_logs)
+    monkeypatch.setattr(frontend_app, "UPLOADS_DIR", tmp_uploads)
+    monkeypatch.setattr(frontend_app, "TELEGRAM_LOG_FILE", tmp_logs / "telegram_parser_log.jsonl")
+    monkeypatch.setattr(frontend_app, "DATABASE_LOG_FILE", tmp_logs / "database_parser_log.jsonl")
+    monkeypatch.setattr(frontend_app, "YOUTUBE_LOG_FILE", tmp_logs / "youtube_parser_log.jsonl")
+    monkeypatch.setattr(frontend_app, "SURVEY_LOG_FILE", tmp_logs / "survey_extractor_log.jsonl")
+    monkeypatch.setattr(frontend_app, "TELEMETRY_LOG_FILE", tmp_logs / "telemetry_parser_log.jsonl")
+
+    tmp_telemetry_db = tmp_logs / "telemetry.db"
+    monkeypatch.setattr(frontend_app, "TELEMETRY_DB_FILE", tmp_telemetry_db)
+    monkeypatch.setattr(frontend_app, "telemetry_service", TelemetryService(db_path=tmp_telemetry_db))
+
+    class IsolatedOCRSystem(RealOCRSystem):
+        def __init__(self, *args, **kwargs):
+            kwargs.setdefault("log_dir", tmp_logs)
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(frontend_app, "OCRSystem", IsolatedOCRSystem)
+
+    from ducklake import LakehouseConfig, LakehouseService
+
+    tmp_lh = tmp_path / "lakehouse"
+    monkeypatch.setattr(
+        frontend_app.app.state,
+        "lakehouse_service",
+        LakehouseService(LakehouseConfig(project_root=tmp_path, logs_dir=tmp_logs, lakehouse_dir=tmp_lh)),
+        raising=False,
+    )
+
+

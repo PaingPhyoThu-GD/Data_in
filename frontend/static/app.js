@@ -39,10 +39,14 @@ const tabOCR = document.getElementById("tabOCR");
 const tabTelegram = document.getElementById("tabTelegram");
 const tabDatabase = document.getElementById("tabDatabase");
 const tabYouTube = document.getElementById("tabYouTube");
+const tabSurvey = document.getElementById("tabSurvey");
+const tabTelemetry = document.getElementById("tabTelemetry");
 const viewOCR = document.getElementById("viewOCR");
 const viewTelegram = document.getElementById("viewTelegram");
 const viewDatabase = document.getElementById("viewDatabase");
 const viewYouTube = document.getElementById("viewYouTube");
+const viewSurvey = document.getElementById("viewSurvey");
+const viewTelemetry = document.getElementById("viewTelemetry");
 const brandSubtitle = document.getElementById("brandSubtitle");
 const ocrStatusBadge = document.getElementById("ocrStatusBadge");
 const btnToggleHistory = document.getElementById("btnToggleHistory");
@@ -179,6 +183,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupTelegramEventListeners();
     setupDatabaseEventListeners();
     setupYouTubeEventListeners();
+    setupSurveyEventListeners();
+    setupTelemetryEventListeners();
 });
 
 // =============================================================================
@@ -189,6 +195,10 @@ function setupNavigation() {
     tabTelegram.addEventListener("click", () => switchService("telegram"));
     tabDatabase.addEventListener("click", () => switchService("database"));
     tabYouTube.addEventListener("click", () => switchService("youtube"));
+    if (tabSurvey) tabSurvey.addEventListener("click", () => switchService("survey"));
+    if (tabTelemetry) tabTelemetry.addEventListener("click", () => switchService("telemetry"));
+    const tabDuckLake = document.getElementById("tabDuckLake");
+    if (tabDuckLake) tabDuckLake.addEventListener("click", () => switchService("ducklake"));
 
     // Unified dynamic history button
     btnToggleHistory.addEventListener("click", toggleActiveHistory);
@@ -198,12 +208,15 @@ function switchService(serviceName) {
     if (activeService === serviceName) return;
     activeService = serviceName;
 
+    const tabDuckLake = document.getElementById("tabDuckLake");
+    const viewDuckLake = document.getElementById("viewDuckLake");
+
     // Reset all tabs
-    [tabOCR, tabTelegram, tabDatabase, tabYouTube].forEach(btn => {
+    [tabOCR, tabTelegram, tabDatabase, tabYouTube, tabSurvey, tabTelemetry, tabDuckLake].filter(Boolean).forEach(btn => {
         btn.classList.remove("active");
         btn.classList.add("text-slate-400");
     });
-    [viewOCR, viewTelegram, viewDatabase, viewYouTube].forEach(view => view.classList.add("hidden"));
+    [viewOCR, viewTelegram, viewDatabase, viewYouTube, viewSurvey, viewTelemetry, viewDuckLake].filter(Boolean).forEach(view => view.classList.add("hidden"));
 
     if (serviceName === "ocr") {
         tabOCR.classList.add("active");
@@ -242,6 +255,47 @@ function switchService(serviceName) {
         const ytHistSec = document.getElementById("ytHistorySection");
         updateHistoryBtnVisualState(ytHistSec && !ytHistSec.classList.contains("hidden"));
         brandSubtitle.textContent = "YouTube Channel Metadata & Video Catalog to Structured JSON";
+    } else if (serviceName === "survey") {
+        if (tabSurvey) {
+            tabSurvey.classList.add("active");
+            tabSurvey.classList.remove("text-slate-400");
+        }
+        if (viewSurvey) viewSurvey.classList.remove("hidden");
+
+        ocrStatusBadge.classList.add("hidden");
+        historyBtnLabel.textContent = "Survey History";
+        const surveyHistSec = document.getElementById("surveyHistorySection");
+        updateHistoryBtnVisualState(surveyHistSec && !surveyHistSec.classList.contains("hidden"));
+        brandSubtitle.textContent = "Google Forms CSV Survey Response to Structured JSON Extractor";
+    } else if (serviceName === "telemetry") {
+        if (tabTelemetry) {
+            tabTelemetry.classList.add("active");
+            tabTelemetry.classList.remove("text-slate-400");
+        }
+        if (viewTelemetry) viewTelemetry.classList.remove("hidden");
+
+        ocrStatusBadge.classList.add("hidden");
+        historyBtnLabel.textContent = "Telemetry History";
+        const telemetryHistSec = document.getElementById("telemetryHistorySection");
+        updateHistoryBtnVisualState(telemetryHistSec && !telemetryHistSec.classList.contains("hidden"));
+        brandSubtitle.textContent = "Website & App Traffic Telemetry • Observability to JSON";
+    } else if (serviceName === "ducklake") {
+        const tabDuckLake = document.getElementById("tabDuckLake");
+        const viewDuckLake = document.getElementById("viewDuckLake");
+        if (tabDuckLake) {
+            tabDuckLake.classList.add("active");
+            tabDuckLake.classList.remove("text-slate-400");
+        }
+        if (viewDuckLake) viewDuckLake.classList.remove("hidden");
+
+        ocrStatusBadge.classList.add("hidden");
+        historyBtnLabel.textContent = "Pipeline Runs";
+        const dlHistSec = document.getElementById("ducklakeHistorySection");
+        updateHistoryBtnVisualState(dlHistSec && !dlHistSec.classList.contains("hidden"));
+        brandSubtitle.textContent = "DuckLake Medallion Pipeline • Bronze, Silver, Quality Gate & Gold Marts";
+        if (typeof window.initDuckLakeTab === "function") {
+            window.initDuckLakeTab();
+        }
     }
     lucide.createIcons();
 }
@@ -280,6 +334,39 @@ function toggleActiveHistory() {
             if (isOpen) {
                 loadYtHistory();
                 ytHistSec.scrollIntoView({ behavior: "smooth" });
+            }
+        }
+    } else if (activeService === "survey") {
+        const surveyHistSec = document.getElementById("surveyHistorySection");
+        if (surveyHistSec) {
+            surveyHistSec.classList.toggle("hidden");
+            const isOpen = !surveyHistSec.classList.contains("hidden");
+            updateHistoryBtnVisualState(isOpen);
+            if (isOpen) {
+                loadSurveyHistory();
+                surveyHistSec.scrollIntoView({ behavior: "smooth" });
+            }
+        }
+    } else if (activeService === "telemetry") {
+        const telemetryHistSec = document.getElementById("telemetryHistorySection");
+        if (telemetryHistSec) {
+            telemetryHistSec.classList.toggle("hidden");
+            const isOpen = !telemetryHistSec.classList.contains("hidden");
+            updateHistoryBtnVisualState(isOpen);
+            if (isOpen) {
+                loadTelemetryHistory();
+                telemetryHistSec.scrollIntoView({ behavior: "smooth" });
+            }
+        }
+    } else if (activeService === "ducklake") {
+        const dlHistSec = document.getElementById("ducklakeHistorySection");
+        if (dlHistSec) {
+            dlHistSec.classList.toggle("hidden");
+            const isOpen = !dlHistSec.classList.contains("hidden");
+            updateHistoryBtnVisualState(isOpen);
+            if (isOpen && typeof window.toggleDuckLakeHistory === "function") {
+                window.toggleDuckLakeHistory();
+                dlHistSec.scrollIntoView({ behavior: "smooth" });
             }
         }
     }
@@ -2355,3 +2442,1065 @@ function showToast(message, type = "info") {
         setTimeout(() => toast.remove(), 250);
     }, 3200);
 }
+
+
+// =============================================================================
+// SERVICE 5: SURVEY DATA TO JSON EXTRACTOR (PERPLEXITY MINIMALIST UI)
+// =============================================================================
+let currentSurveyData = null;
+let surveySelectedFile = null;
+let surveyCurrentPage = 1;
+let surveyPageSize = 25;
+let surveySearchFilter = "";
+
+function setupSurveyEventListeners() {
+    const dropzone = document.getElementById("surveyDropzone");
+    const fileInput = document.getElementById("surveyFileInput");
+    const fileLabel = document.getElementById("surveyFileLabel");
+    const btnExtract = document.getElementById("btnExtractSurvey");
+    const btnLoadSample = document.getElementById("btnLoadSampleSurvey");
+    const searchInput = document.getElementById("surveySearchInput");
+    const btnCopyJSON = document.getElementById("btnCopySurveyJSON");
+    const btnDownloadJSON = document.getElementById("btnDownloadSurveyJSON");
+    const btnToggleRawJSON = document.getElementById("btnToggleSurveyRawJSON");
+    const btnCopyRawJSON = document.getElementById("btnCopyRawSurveyJSON");
+    const btnPrevPage = document.getElementById("btnSurveyPrevPage");
+    const btnNextPage = document.getElementById("btnSurveyNextPage");
+    const btnRefreshHistory = document.getElementById("btnRefreshSurveyHistory");
+
+    if (!dropzone || !fileInput) return;
+
+    // Dropzone click & drag/drop
+    dropzone.addEventListener("click", () => fileInput.click());
+
+    dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("dragover");
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleSurveyFileSelected(e.dataTransfer.files[0]);
+        }
+    });
+
+    fileInput.addEventListener("change", (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            handleSurveyFileSelected(e.target.files[0]);
+        }
+    });
+
+    function handleSurveyFileSelected(file) {
+        if (!file.name.toLowerCase().endsWith(".csv")) {
+            showToast("Please select a valid CSV file (.csv).", "warning");
+            return;
+        }
+        surveySelectedFile = file;
+        fileLabel.innerHTML = `<span class="text-emerald-400 font-semibold">${escapeHtml(file.name)}</span> (${formatFileSize(file.size)})`;
+        showToast(`Selected: ${file.name}`, "info");
+    }
+
+    // Extract Survey Trigger
+    if (btnExtract) {
+        btnExtract.addEventListener("click", async () => {
+            if (!surveySelectedFile) {
+                showToast("Please upload or drop a Google Forms CSV file first.", "warning");
+                return;
+            }
+
+            const titleInput = document.getElementById("surveyTitleInput");
+            const surveyTitle = titleInput ? titleInput.value.trim() : "";
+
+            const formData = new FormData();
+            formData.append("file", surveySelectedFile);
+            if (surveyTitle) {
+                formData.append("survey_title", surveyTitle);
+            }
+
+            const btnLabel = document.getElementById("btnExtractSurveyLabel");
+            btnExtract.disabled = true;
+            btnLabel.textContent = "Extracting CSV...";
+
+            try {
+                const response = await fetch("/api/surveys/extract", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.message || `Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                renderSurveyResult(data);
+                showToast(`Successfully extracted ${data.metadata.total_responses} responses!`, "success");
+            } catch (err) {
+                console.error("Survey extraction failed:", err);
+                showToast(`Extraction error: ${err.message}`, "error");
+            } finally {
+                btnExtract.disabled = false;
+                btnLabel.textContent = "Extract to Structured JSON";
+            }
+        });
+    }
+
+    // Load Sample Survey Trigger
+    if (btnLoadSample) {
+        btnLoadSample.addEventListener("click", async () => {
+            btnLoadSample.disabled = true;
+            try {
+                const response = await fetch("/api/surveys/sample", { method: "POST" });
+                if (!response.ok) {
+                    throw new Error(`Failed to load sample: ${response.status}`);
+                }
+                const data = await response.json();
+                renderSurveyResult(data);
+                showToast("Sample Google Forms survey loaded!", "success");
+            } catch (err) {
+                console.error("Failed to load sample survey:", err);
+                showToast(`Error: ${err.message}`, "error");
+            } finally {
+                btnLoadSample.disabled = false;
+            }
+        });
+    }
+
+    // Search filter
+    if (searchInput) {
+        searchInput.addEventListener("input", (e) => {
+            surveySearchFilter = e.target.value.toLowerCase().trim();
+            surveyCurrentPage = 1;
+            renderSurveyTableRows();
+        });
+    }
+
+    // Copy JSON
+    if (btnCopyJSON) {
+        btnCopyJSON.addEventListener("click", () => {
+            if (!currentSurveyData) return;
+            navigator.clipboard.writeText(JSON.stringify(currentSurveyData, null, 2))
+                .then(() => showToast("Survey JSON copied to clipboard!", "success"))
+                .catch(() => showToast("Failed to copy JSON.", "error"));
+        });
+    }
+
+    if (btnCopyRawJSON) {
+        btnCopyRawJSON.addEventListener("click", () => {
+            if (!currentSurveyData) return;
+            navigator.clipboard.writeText(JSON.stringify(currentSurveyData, null, 2))
+                .then(() => showToast("Survey JSON copied!", "success"));
+        });
+    }
+
+    // Download JSON
+    if (btnDownloadJSON) {
+        btnDownloadJSON.addEventListener("click", () => {
+            if (!currentSurveyData) return;
+            const filename = `${(currentSurveyData.metadata.title || "survey_export").replace(/\s+/g, "_")}.json`;
+            downloadTextFile(filename, JSON.stringify(currentSurveyData, null, 2));
+            showToast(`Downloaded: ${filename}`, "info");
+        });
+    }
+
+    // Toggle Raw JSON
+    if (btnToggleRawJSON) {
+        btnToggleRawJSON.addEventListener("click", () => {
+            const box = document.getElementById("surveyRawJsonBox");
+            if (box) {
+                box.classList.toggle("hidden");
+                lucide.createIcons();
+            }
+        });
+    }
+
+    // Pagination
+    if (btnPrevPage) {
+        btnPrevPage.addEventListener("click", () => {
+            if (surveyCurrentPage > 1) {
+                surveyCurrentPage--;
+                renderSurveyTableRows();
+            }
+        });
+    }
+
+    if (btnNextPage) {
+        btnNextPage.addEventListener("click", () => {
+            const filtered = getFilteredResponses();
+            const totalPages = Math.ceil(filtered.length / surveyPageSize) || 1;
+            if (surveyCurrentPage < totalPages) {
+                surveyCurrentPage++;
+                renderSurveyTableRows();
+            }
+        });
+    }
+
+    // History refresh
+    if (btnRefreshHistory) {
+        btnRefreshHistory.addEventListener("click", loadSurveyHistory);
+    }
+}
+
+function renderSurveyResult(data) {
+    currentSurveyData = data;
+    surveyCurrentPage = 1;
+
+    const resultSection = document.getElementById("surveyResultSection");
+    if (resultSection) resultSection.classList.remove("hidden");
+
+    // Overview Stats
+    const titleEl = document.getElementById("surveyResultTitle");
+    const metaEl = document.getElementById("surveyFileMeta");
+    const questionsEl = document.getElementById("surveyTotalQuestions");
+    const responsesEl = document.getElementById("surveyTotalResponses");
+    const validEl = document.getElementById("surveyValidResponses");
+    const multiCountEl = document.getElementById("surveyMultiSelectCount");
+
+    if (titleEl) titleEl.textContent = data.metadata.title || "Untitled Survey";
+    if (metaEl) {
+        metaEl.textContent = `File: ${data.metadata.file_name} • ID: ${data.survey_id} • Extracted: ${formatTime(data.metadata.created_at)}`;
+    }
+    if (questionsEl) questionsEl.textContent = data.metadata.total_questions;
+    if (responsesEl) responsesEl.textContent = data.metadata.total_responses;
+    if (validEl) validEl.textContent = data.metadata.valid_responses;
+
+    const multiQuestions = (data.questions || []).filter(q => q.field_type === "multi_select");
+    if (multiCountEl) multiCountEl.textContent = multiQuestions.length;
+
+    // Raw JSON Box
+    const rawJsonContent = document.getElementById("surveyRawJsonContent");
+    if (rawJsonContent) {
+        rawJsonContent.textContent = JSON.stringify(data, null, 2);
+    }
+
+    // Render Question Schema Cards
+    renderSurveyQuestions(data.questions || []);
+
+    // Render Table
+    renderSurveyTableRows();
+
+    // Scroll smoothly to results
+    if (resultSection) {
+        resultSection.scrollIntoView({ behavior: "smooth" });
+    }
+    lucide.createIcons();
+}
+
+function renderSurveyQuestions(questions) {
+    const grid = document.getElementById("surveyQuestionsGrid");
+    if (!grid) return;
+
+    if (!questions || questions.length === 0) {
+        grid.innerHTML = `<p class="text-xs text-slate-500">No questions detected.</p>`;
+        return;
+    }
+
+    const typeBadgeStyles = {
+        timestamp: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+        email: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+        multi_select: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+        number: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+        boolean: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+        text: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+    };
+
+    grid.innerHTML = questions.map((q, idx) => {
+        const badgeClass = typeBadgeStyles[q.field_type] || typeBadgeStyles.text;
+        const optionsHtml = (q.detected_options && q.detected_options.length > 0)
+            ? `<div class="mt-2.5 flex flex-wrap gap-1.5">
+                ${q.detected_options.map(opt => `<span class="survey-tag-pill px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono">${escapeHtml(opt)}</span>`).join("")}
+               </div>`
+            : "";
+
+        return `
+            <div class="glass-card rounded-[24px] p-5 border border-white/5 flex flex-col justify-between transition-all duration-200 hover:border-emerald-500/30">
+                <div>
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <span class="text-[10px] font-mono text-slate-500 font-bold">Col #${idx + 1} (${escapeHtml(q.question_id)})</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border font-mono ${badgeClass}">
+                            ${escapeHtml(q.field_type.replace('_', ' '))}
+                        </span>
+                    </div>
+                    <h5 class="text-sm font-bold text-white leading-snug">${escapeHtml(q.question_text)}</h5>
+                </div>
+                ${optionsHtml}
+            </div>
+        `;
+    }).join("");
+}
+
+function getFilteredResponses() {
+    if (!currentSurveyData || !currentSurveyData.responses) return [];
+    if (!surveySearchFilter) return currentSurveyData.responses;
+
+    return currentSurveyData.responses.filter(resp => {
+        if (resp.email && resp.email.toLowerCase().includes(surveySearchFilter)) return true;
+        if (resp.submitted_at && resp.submitted_at.toLowerCase().includes(surveySearchFilter)) return true;
+        for (const [qId, val] of Object.entries(resp.answers || {})) {
+            if (val === null || val === undefined) continue;
+            if (Array.isArray(val)) {
+                if (val.some(item => String(item).toLowerCase().includes(surveySearchFilter))) return true;
+            } else if (String(val).toLowerCase().includes(surveySearchFilter)) {
+                return true;
+            }
+        }
+        return false;
+    });
+}
+
+function renderSurveyTableRows() {
+    const tableContainer = document.getElementById("surveyTableContainer");
+    const badgeEl = document.getElementById("surveyTableBadge");
+    const paginationInfo = document.getElementById("surveyPaginationInfo");
+    const pageIndicator = document.getElementById("surveyPageIndicator");
+    const btnPrev = document.getElementById("btnSurveyPrevPage");
+    const btnNext = document.getElementById("btnSurveyNextPage");
+
+    if (!tableContainer || !currentSurveyData) return;
+
+    const questions = currentSurveyData.questions || [];
+    const filtered = getFilteredResponses();
+    const totalCount = filtered.length;
+
+    if (badgeEl) badgeEl.textContent = `${totalCount} rows`;
+
+    const totalPages = Math.ceil(totalCount / surveyPageSize) || 1;
+    if (surveyCurrentPage > totalPages) surveyCurrentPage = totalPages;
+    if (surveyCurrentPage < 1) surveyCurrentPage = 1;
+
+    const startIdx = (surveyCurrentPage - 1) * surveyPageSize;
+    const endIdx = Math.min(startIdx + surveyPageSize, totalCount);
+    const pageRows = filtered.slice(startIdx, endIdx);
+
+    if (paginationInfo) {
+        paginationInfo.textContent = totalCount > 0
+            ? `Showing ${startIdx + 1} - ${endIdx} of ${totalCount} responses`
+            : "No matching responses";
+    }
+    if (pageIndicator) pageIndicator.textContent = `${surveyCurrentPage} / ${totalPages}`;
+    if (btnPrev) btnPrev.disabled = surveyCurrentPage <= 1;
+    if (btnNext) btnNext.disabled = surveyCurrentPage >= totalPages;
+
+    if (pageRows.length === 0) {
+        tableContainer.innerHTML = `
+            <div class="text-center py-12 text-slate-500 text-xs">
+                <i data-lucide="search-x" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+                No survey responses match the filter query.
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    // Build Table
+    const headerCols = [
+        `<th class="px-4 py-3 text-left text-slate-400 font-mono text-[11px] font-bold uppercase tracking-wider sticky left-0 bg-slate-950 z-10 border-b border-white/10">#</th>`,
+        ...questions.map(q => `
+            <th class="px-4 py-3 text-left text-slate-300 text-xs font-bold tracking-tight border-b border-white/10 min-w-[180px]">
+                <div class="flex flex-col gap-0.5">
+                    <span>${escapeHtml(q.question_text)}</span>
+                    <span class="text-[10px] font-mono text-emerald-400/80 font-normal uppercase">${escapeHtml(q.field_type)}</span>
+                </div>
+            </th>
+        `)
+    ].join("");
+
+    const rowItems = pageRows.map(row => {
+        const rowCells = [
+            `<td class="px-4 py-3 text-[11px] font-mono text-slate-500 sticky left-0 bg-slate-950 z-10 border-b border-white/5">${row.row_number}</td>`,
+            ...questions.map(q => {
+                const val = (row.answers || {})[q.question_id];
+                return `<td class="px-4 py-3 text-xs text-slate-200 border-b border-white/5 align-top">${formatCellValue(val, q.field_type)}</td>`;
+            })
+        ].join("");
+
+        return `<tr class="survey-row transition-colors">${rowCells}</tr>`;
+    }).join("");
+
+    tableContainer.innerHTML = `
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-900/80">${headerCols}</tr>
+            </thead>
+            <tbody>
+                ${rowItems}
+            </tbody>
+        </table>
+    `;
+    lucide.createIcons();
+}
+
+function formatCellValue(val, fieldType) {
+    if (val === null || val === undefined || val === "") {
+        return `<span class="text-slate-600 font-mono italic">empty</span>`;
+    }
+
+    if (fieldType === "multi_select" && Array.isArray(val)) {
+        if (val.length === 0) return `<span class="text-slate-600 font-mono italic">none</span>`;
+        return `
+            <div class="flex flex-wrap gap-1">
+                ${val.map(item => `<span class="survey-tag-pill px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">${escapeHtml(String(item))}</span>`).join("")}
+            </div>
+        `;
+    }
+
+    if (fieldType === "boolean") {
+        return val === true
+            ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">TRUE</span>`
+            : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/50 text-slate-400 border border-slate-600">FALSE</span>`;
+    }
+
+    if (fieldType === "number") {
+        return `<span class="font-mono font-bold text-amber-300">${val}</span>`;
+    }
+
+    if (fieldType === "email") {
+        return `<span class="font-mono text-purple-300">${escapeHtml(String(val))}</span>`;
+    }
+
+    if (fieldType === "timestamp") {
+        return `<span class="font-mono text-blue-300 text-[11px]">${escapeHtml(String(val))}</span>`;
+    }
+
+    return `<span>${escapeHtml(String(val))}</span>`;
+}
+
+async function loadSurveyHistory() {
+    const listContainer = document.getElementById("surveyHistoryListContainer");
+    if (!listContainer) return;
+
+    listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">Loading past survey extractions...</p>`;
+
+    try {
+        const response = await fetch("/api/surveys/history?limit=20");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const records = await response.json();
+
+        if (!records || records.length === 0) {
+            listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">No survey extractions recorded in history yet.</p>`;
+            return;
+        }
+
+        listContainer.innerHTML = records.map(item => `
+            <div class="glass-card rounded-[24px] p-5 border border-white/5 flex items-center justify-between gap-4 transition hover:border-emerald-500/30">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                        <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-bold text-white">${escapeHtml(item.title || item.file_name)}</h4>
+                        <p class="text-xs text-slate-400 mt-0.5 font-mono">
+                            ${item.total_questions} questions • ${item.total_responses} responses • ${formatTime(item.timestamp)}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-load-survey-hist px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 transition" data-survey-id="${escapeHtml(item.survey_id)}">
+                        Load in Viewer
+                    </button>
+                </div>
+            </div>
+        `).join("");
+
+        // Attach load triggers
+        listContainer.querySelectorAll(".btn-load-survey-hist").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const sId = btn.getAttribute("data-survey-id");
+                const targetRecord = records.find(r => r.survey_id === sId);
+                if (targetRecord && targetRecord.data) {
+                    renderSurveyResult(targetRecord.data);
+                    showToast(`Loaded survey: ${targetRecord.title}`, "info");
+                }
+            });
+        });
+        lucide.createIcons();
+    } catch (err) {
+        listContainer.innerHTML = `<p class="text-xs text-rose-400 text-center py-6">Failed to load history: ${escapeHtml(err.message)}</p>`;
+    }
+}
+
+// =============================================================================
+// SERVICE 6: TELEMETRY & TRAFFIC INTELLIGENCE (Perplexity Aesthetic)
+// =============================================================================
+let selectedTelemetryFile = null;
+let latestTelemetryPayload = null;
+let telemetryCurrentPage = 1;
+const telemetryPageSize = 25;
+let telemetrySearchFilter = "";
+
+function setupTelemetryEventListeners() {
+    // Mode Switchers
+    const btnModeFile = document.getElementById("btnModeFile");
+    const btnModeVercel = document.getElementById("btnModeVercel");
+    const btnModeDrain = document.getElementById("btnModeDrain");
+    const btnModeBeacon = document.getElementById("btnModeBeacon");
+
+    const modeFileCont = document.getElementById("telemetryModeFileContainer");
+    const modeVercelCont = document.getElementById("telemetryModeVercelContainer");
+    const modeDrainCont = document.getElementById("telemetryModeDrainContainer");
+    const modeBeaconCont = document.getElementById("telemetryModeBeaconContainer");
+
+    const modeButtons = [btnModeFile, btnModeVercel, btnModeDrain, btnModeBeacon].filter(Boolean);
+    const modeContainers = [modeFileCont, modeVercelCont, modeDrainCont, modeBeaconCont].filter(Boolean);
+
+    function switchTelemetryMode(targetBtn, targetCont) {
+        modeButtons.forEach(b => {
+            b.classList.remove("active", "text-slate-300");
+            b.classList.add("text-slate-400");
+        });
+        modeContainers.forEach(c => c.classList.add("hidden"));
+
+        if (targetBtn) {
+            targetBtn.classList.add("active", "text-slate-300");
+            targetBtn.classList.remove("text-slate-400");
+        }
+        if (targetCont) targetCont.classList.remove("hidden");
+        lucide.createIcons();
+    }
+
+    if (btnModeFile) btnModeFile.addEventListener("click", () => switchTelemetryMode(btnModeFile, modeFileCont));
+    if (btnModeVercel) btnModeVercel.addEventListener("click", () => switchTelemetryMode(btnModeVercel, modeVercelCont));
+    if (btnModeDrain) btnModeDrain.addEventListener("click", () => switchTelemetryMode(btnModeDrain, modeDrainCont));
+    if (btnModeBeacon) btnModeBeacon.addEventListener("click", () => switchTelemetryMode(btnModeBeacon, modeBeaconCont));
+
+    // File Dropzone
+    const dropzone = document.getElementById("telemetryDropzone");
+    const fileInput = document.getElementById("telemetryFileInput");
+    const btnBrowse = document.getElementById("btnBrowseTelemetry");
+    const filePreview = document.getElementById("telemetryFilePreview");
+    const selectedFileName = document.getElementById("telemetrySelectedFileName");
+    const selectedFileSize = document.getElementById("telemetrySelectedFileSize");
+    const btnProcess = document.getElementById("btnProcessTelemetry");
+    const btnSample = document.getElementById("btnLoadSampleTelemetry");
+
+    if (btnBrowse && fileInput) {
+        btnBrowse.addEventListener("click", (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+    }
+
+    if (dropzone && fileInput) {
+        dropzone.addEventListener("click", () => fileInput.click());
+
+        ["dragenter", "dragover"].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add("dragover");
+            });
+        });
+
+        ["dragleave", "drop"].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove("dragover");
+            });
+        });
+
+        dropzone.addEventListener("drop", (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                handleTelemetryFileSelect(dt.files[0]);
+            }
+        });
+
+        fileInput.addEventListener("change", (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                handleTelemetryFileSelect(e.target.files[0]);
+            }
+        });
+    }
+
+    function handleTelemetryFileSelect(file) {
+        selectedTelemetryFile = file;
+        if (selectedFileName) selectedFileName.textContent = file.name;
+        if (selectedFileSize) selectedFileSize.textContent = formatBytes(file.size);
+        if (filePreview) filePreview.classList.remove("hidden");
+        showToast(`Selected telemetry file: ${file.name}`, "info");
+    }
+
+    // Ingest Action
+    if (btnProcess) {
+        btnProcess.addEventListener("click", processTelemetryFile);
+    }
+
+    // Sample Action
+    if (btnSample) {
+        btnSample.addEventListener("click", (e) => {
+            e.stopPropagation();
+            loadSampleTelemetry();
+        });
+    }
+
+    // Vercel Sync
+    const btnSyncVercel = document.getElementById("btnSyncVercel");
+    if (btnSyncVercel) {
+        btnSyncVercel.addEventListener("click", syncVercelApi);
+    }
+
+    // Copy Drain URL
+    const btnCopyDrain = document.getElementById("btnCopyDrainUrl");
+    if (btnCopyDrain) {
+        btnCopyDrain.addEventListener("click", () => {
+            const urlText = "http://localhost:8000/api/telemetry/drain";
+            navigator.clipboard.writeText(urlText).then(() => {
+                showToast("Webhook URL copied to clipboard!", "success");
+            });
+        });
+    }
+
+    // Copy Beacon Code
+    const btnCopyBeacon = document.getElementById("btnCopyBeaconCode");
+    if (btnCopyBeacon) {
+        btnCopyBeacon.addEventListener("click", () => {
+            const scriptTag = '<script defer src="/static/telemetry.js" data-site="my-app"><\/script>';
+            navigator.clipboard.writeText(scriptTag).then(() => {
+                showToast("Beacon script tag copied!", "success");
+            });
+        });
+    }
+
+    // Search and Filtering
+    const searchInput = document.getElementById("telemetrySearchInput");
+    if (searchInput) {
+        searchInput.addEventListener("input", (e) => {
+            telemetrySearchFilter = e.target.value.trim().toLowerCase();
+            telemetryCurrentPage = 1;
+            renderTelemetryTable();
+        });
+    }
+
+    // Pagination
+    const btnPrev = document.getElementById("btnTelemetryPrevPage");
+    const btnNext = document.getElementById("btnTelemetryNextPage");
+
+    if (btnPrev) {
+        btnPrev.addEventListener("click", () => {
+            if (telemetryCurrentPage > 1) {
+                telemetryCurrentPage--;
+                renderTelemetryTable();
+            }
+        });
+    }
+
+    if (btnNext) {
+        btnNext.addEventListener("click", () => {
+            telemetryCurrentPage++;
+            renderTelemetryTable();
+        });
+    }
+
+    // Copy / Download JSON
+    const btnCopyJSON = document.getElementById("btnCopyTelemetryJSON");
+    const btnDownloadJSON = document.getElementById("btnDownloadTelemetryJSON");
+    const btnToggleRawJSON = document.getElementById("btnToggleTelemetryRawJSON");
+
+    if (btnCopyJSON) {
+        btnCopyJSON.addEventListener("click", () => {
+            if (!latestTelemetryPayload) return;
+            navigator.clipboard.writeText(JSON.stringify(latestTelemetryPayload, null, 2)).then(() => {
+                showToast("Telemetry JSON copied to clipboard!", "success");
+            });
+        });
+    }
+
+    if (btnDownloadJSON) {
+        btnDownloadJSON.addEventListener("click", () => {
+            if (!latestTelemetryPayload) return;
+            const blob = new Blob([JSON.stringify(latestTelemetryPayload, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `telemetry_${latestTelemetryPayload.site_id || "stats"}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast("Downloaded telemetry analytics JSON", "success");
+        });
+    }
+
+    if (btnToggleRawJSON) {
+        btnToggleRawJSON.addEventListener("click", () => {
+            const box = document.getElementById("telemetryRawJSONContainer");
+            if (box) box.classList.toggle("hidden");
+        });
+    }
+
+    // History Refresh
+    const btnRefreshHist = document.getElementById("btnRefreshTelemetryHistory");
+    if (btnRefreshHist) {
+        btnRefreshHist.addEventListener("click", loadTelemetryHistory);
+    }
+}
+
+async function processTelemetryFile() {
+    if (!selectedTelemetryFile) {
+        showToast("Please select a telemetry log file first.", "warning");
+        return;
+    }
+
+    const loadingSec = document.getElementById("telemetryLoadingSection");
+    const resultsSec = document.getElementById("telemetryResultsSection");
+    const statusText = document.getElementById("telemetryLoadingStatus");
+
+    if (loadingSec) loadingSec.classList.remove("hidden");
+    if (resultsSec) resultsSec.classList.add("hidden");
+    if (statusText) statusText.textContent = `Analyzing ${selectedTelemetryFile.name}...`;
+
+    const formData = new FormData();
+    formData.append("file", selectedTelemetryFile);
+    formData.append("site_id", "default");
+
+    try {
+        const response = await fetch("/api/telemetry/import", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.message || errData.detail || `HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        renderTelemetryDashboard(payload);
+        showToast("Telemetry logs successfully analyzed!", "success");
+    } catch (err) {
+        showToast(`Telemetry processing failed: ${err.message}`, "error");
+    } finally {
+        if (loadingSec) loadingSec.classList.add("hidden");
+    }
+}
+
+async function loadSampleTelemetry() {
+    const loadingSec = document.getElementById("telemetryLoadingSection");
+    const resultsSec = document.getElementById("telemetryResultsSection");
+    const statusText = document.getElementById("telemetryLoadingStatus");
+
+    if (loadingSec) loadingSec.classList.remove("hidden");
+    if (resultsSec) resultsSec.classList.add("hidden");
+    if (statusText) statusText.textContent = "Loading sample Vercel telemetry logs...";
+
+    try {
+        const response = await fetch("/api/telemetry/sample", { method: "POST" });
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.message || errData.detail || `HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        renderTelemetryDashboard(payload);
+        showToast("Loaded sample Vercel telemetry!", "success");
+    } catch (err) {
+        showToast(`Failed to load sample: ${err.message}`, "error");
+    } finally {
+        if (loadingSec) loadingSec.classList.add("hidden");
+    }
+}
+
+async function syncVercelApi() {
+    const projectId = document.getElementById("vercelProjectIdInput").value.trim();
+    const token = document.getElementById("vercelTokenInput").value.trim();
+    const teamId = document.getElementById("vercelTeamIdInput").value.trim();
+
+    if (!projectId || !token) {
+        showToast("Project ID and Vercel Bearer Token are required.", "warning");
+        return;
+    }
+
+    const loadingSec = document.getElementById("telemetryLoadingSection");
+    const resultsSec = document.getElementById("telemetryResultsSection");
+    const statusText = document.getElementById("telemetryLoadingStatus");
+
+    if (loadingSec) loadingSec.classList.remove("hidden");
+    if (resultsSec) resultsSec.classList.add("hidden");
+    if (statusText) statusText.textContent = `Syncing Web Analytics for project ${projectId}...`;
+
+    try {
+        const response = await fetch("/api/telemetry/sync/vercel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                project_id: projectId,
+                token: token,
+                team_id: teamId || null,
+            }),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.message || errData.detail || `HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        renderTelemetryDashboard(payload);
+        showToast("Vercel Web Analytics synced successfully!", "success");
+    } catch (err) {
+        showToast(`Vercel sync error: ${err.message}`, "error");
+    } finally {
+        if (loadingSec) loadingSec.classList.add("hidden");
+    }
+}
+
+function renderTelemetryDashboard(payload) {
+    latestTelemetryPayload = payload;
+    telemetryCurrentPage = 1;
+
+    const resultsSec = document.getElementById("telemetryResultsSection");
+    if (resultsSec) resultsSec.classList.remove("hidden");
+
+    // Header metadata
+    const sourceTitle = document.getElementById("telemetrySourceTitle");
+    const siteLabel = document.getElementById("telemetrySiteLabel");
+    const sessionLabel = document.getElementById("telemetrySessionLabel");
+    const countBadge = document.getElementById("telemetryTotalCountBadge");
+
+    if (sourceTitle) sourceTitle.textContent = payload.source_name || "Telemetry Dataset";
+    if (siteLabel) siteLabel.textContent = payload.site_id || "default";
+    if (sessionLabel) sessionLabel.textContent = (payload.session_id || "").slice(0, 10) + "...";
+    if (countBadge) countBadge.textContent = payload.total_records.toLocaleString();
+
+    // 4 KPI Cards
+    const kpis = payload.kpis || {};
+    const kpiViews = document.getElementById("telemetryKpiPageviews");
+    const kpiVisitors = document.getElementById("telemetryKpiVisitors");
+    const kpiBounce = document.getElementById("telemetryKpiBounceRate");
+    const kpiP95 = document.getElementById("telemetryKpiP95");
+    const kpiP50 = document.getElementById("telemetryKpiP50");
+
+    if (kpiViews) kpiViews.textContent = (kpis.total_pageviews || 0).toLocaleString();
+    if (kpiVisitors) kpiVisitors.textContent = (kpis.unique_visitors || 0).toLocaleString();
+    if (kpiBounce) kpiBounce.textContent = `${(kpis.bounce_rate_pct || 0).toFixed(1)}%`;
+    if (kpiP95) kpiP95.textContent = `${(kpis.p95_latency_ms || 0).toFixed(0)} ms`;
+    if (kpiP50) kpiP50.textContent = (kpis.p50_latency_ms || 0).toFixed(0);
+
+    // Top Routes List
+    const routesCont = document.getElementById("telemetryRoutesContainer");
+    if (routesCont) {
+        const routes = payload.routes || [];
+        if (routes.length === 0) {
+            routesCont.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">No route metrics available.</p>`;
+        } else {
+            routesCont.innerHTML = routes.map(r => `
+                <div class="glass-card rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <span class="font-mono text-amber-300 font-bold truncate">${escapeHtml(r.path)}</span>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0 font-mono">
+                        <span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[11px]">${r.pageviews} views</span>
+                        <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px]">${r.p95_latency_ms.toFixed(0)}ms p95</span>
+                        ${r.error_count > 0 ? `<span class="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[11px]">${r.error_count} err</span>` : ''}
+                    </div>
+                </div>
+            `).join("");
+        }
+    }
+
+    // Referrers List
+    const refCont = document.getElementById("telemetryReferrersContainer");
+    if (refCont) {
+        const refs = payload.referrers || [];
+        if (refs.length === 0) {
+            refCont.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">No referrer data found.</p>`;
+        } else {
+            refCont.innerHTML = refs.map(rf => `
+                <div class="glass-card rounded-xl p-3 flex flex-col gap-1.5 text-xs">
+                    <div class="flex items-center justify-between font-mono">
+                        <span class="text-white font-semibold flex items-center gap-1.5">
+                            <i data-lucide="link" class="w-3.5 h-3.5 text-cyan-400"></i>
+                            ${escapeHtml(rf.referrer_domain)}
+                        </span>
+                        <span class="text-slate-400 text-[11px]">${rf.visits} visits (${rf.percentage}%)</span>
+                    </div>
+                    <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500" style="width: ${Math.min(100, rf.percentage)}%"></div>
+                    </div>
+                </div>
+            `).join("");
+        }
+    }
+
+    // Status Code Breakdown
+    const sDist = payload.status_distribution || {};
+    const s2xx = document.getElementById("telemetryStatus2xx");
+    const s3xx = document.getElementById("telemetryStatus3xx");
+    const s4xx = document.getElementById("telemetryStatus4xx");
+    const s5xx = document.getElementById("telemetryStatus5xx");
+
+    if (s2xx) s2xx.textContent = (sDist.status_2xx || 0).toLocaleString();
+    if (s3xx) s3xx.textContent = (sDist.status_3xx || 0).toLocaleString();
+    if (s4xx) s4xx.textContent = (sDist.status_4xx || 0).toLocaleString();
+    if (s5xx) s5xx.textContent = (sDist.status_5xx || 0).toLocaleString();
+
+    // Geos
+    const geosList = document.getElementById("telemetryGeosList");
+    if (geosList) {
+        const geos = payload.geos || [];
+        geosList.innerHTML = geos.map(g => `
+            <span class="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-xs font-mono">
+                ${escapeHtml(g.country_code)}: <strong>${g.visits}</strong>
+            </span>
+        `).join("") || '<span class="text-xs text-slate-500">None</span>';
+    }
+
+    // Clients
+    const clientsList = document.getElementById("telemetryClientsList");
+    if (clientsList) {
+        const browsers = payload.browsers || [];
+        const oss = payload.operating_systems || [];
+        const combined = [...browsers.slice(0, 4), ...oss.slice(0, 3)];
+        clientsList.innerHTML = combined.map(c => `
+            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono">
+                ${escapeHtml(c.name)}: <strong>${c.count}</strong>
+            </span>
+        `).join("") || '<span class="text-xs text-slate-500">None</span>';
+    }
+
+    // Raw JSON Viewer
+    const rawPre = document.getElementById("telemetryRawJSONPre");
+    if (rawPre) {
+        rawPre.textContent = JSON.stringify(payload, null, 2);
+    }
+
+    renderTelemetryTable();
+    lucide.createIcons();
+}
+
+function renderTelemetryTable() {
+    if (!latestTelemetryPayload) return;
+    const allEvents = latestTelemetryPayload.recent_events || [];
+
+    // Filter
+    let filtered = allEvents;
+    if (telemetrySearchFilter) {
+        filtered = allEvents.filter(e => {
+            const haystack = `${e.path} ${e.status_code} ${e.method} ${e.country_code} ${e.browser} ${e.os} ${e.visitor_hash} ${e.referrer_domain}`.toLowerCase();
+            return haystack.includes(telemetrySearchFilter);
+        });
+    }
+
+    const tableBadge = document.getElementById("telemetryTableBadge");
+    if (tableBadge) tableBadge.textContent = `${filtered.length} events`;
+
+    // Pagination math
+    const totalPages = Math.max(1, Math.ceil(filtered.length / telemetryPageSize));
+    if (telemetryCurrentPage > totalPages) telemetryCurrentPage = totalPages;
+
+    const startIdx = (telemetryCurrentPage - 1) * telemetryPageSize;
+    const endIdx = startIdx + telemetryPageSize;
+    const pageItems = filtered.slice(startIdx, endIdx);
+
+    const info = document.getElementById("telemetryPaginationInfo");
+    if (info) info.textContent = `Showing ${filtered.length > 0 ? startIdx + 1 : 0} - ${Math.min(endIdx, filtered.length)} of ${filtered.length} events`;
+
+    const indicator = document.getElementById("telemetryPageIndicator");
+    if (indicator) indicator.textContent = `${telemetryCurrentPage} / ${totalPages}`;
+
+    const btnPrev = document.getElementById("btnTelemetryPrevPage");
+    const btnNext = document.getElementById("btnTelemetryNextPage");
+    if (btnPrev) btnPrev.disabled = telemetryCurrentPage <= 1;
+    if (btnNext) btnNext.disabled = telemetryCurrentPage >= totalPages;
+
+    const tbody = document.getElementById("telemetryTableBody");
+    if (!tbody) return;
+
+    if (pageItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-500">No events matched the filter.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = pageItems.map(ev => {
+        let statusColor = "bg-slate-800 text-slate-300 border-slate-700";
+        if (ev.status_code >= 200 && ev.status_code < 300) {
+            statusColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+        } else if (ev.status_code >= 300 && ev.status_code < 400) {
+            statusColor = "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
+        } else if (ev.status_code >= 400 && ev.status_code < 500) {
+            statusColor = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+        } else if (ev.status_code >= 500) {
+            statusColor = "bg-rose-500/10 text-rose-400 border-rose-500/20";
+        }
+
+        const dateFormatted = ev.datetime_utc ? ev.datetime_utc.replace("T", " ").replace("Z", "") : "--";
+
+        return `
+            <tr class="telemetry-row hover:bg-slate-800/40 transition">
+                <td class="py-2.5 px-4 text-slate-400 text-[11px] whitespace-nowrap">${escapeHtml(dateFormatted)}</td>
+                <td class="py-2.5 px-4 font-bold text-amber-300 max-w-[200px] truncate" title="${escapeHtml(ev.path)}">${escapeHtml(ev.path)}</td>
+                <td class="py-2.5 px-4 text-slate-300 text-[11px]">${escapeHtml(ev.method || "GET")}</td>
+                <td class="py-2.5 px-4">
+                    <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold border ${statusColor}">
+                        ${ev.status_code}
+                    </span>
+                </td>
+                <td class="py-2.5 px-4 text-slate-300">${ev.latency_ms.toFixed(1)} ms</td>
+                <td class="py-2.5 px-4 text-slate-400">${escapeHtml(ev.country_code || "UNKNOWN")}</td>
+                <td class="py-2.5 px-4 text-slate-400 text-[11px]">${escapeHtml(ev.browser || "")} (${escapeHtml(ev.os || "")})</td>
+                <td class="py-2.5 px-4 text-slate-500 text-[11px] font-mono truncate max-w-[120px]" title="${escapeHtml(ev.visitor_hash)}">${escapeHtml(ev.visitor_hash)}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+async function loadTelemetryHistory() {
+    const listContainer = document.getElementById("telemetryHistoryListContainer");
+    if (!listContainer) return;
+
+    listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">Loading telemetry history...</p>`;
+
+    try {
+        const response = await fetch("/api/telemetry/history?limit=20");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const records = await response.json();
+
+        if (!records || records.length === 0) {
+            listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">No telemetry runs recorded in history yet.</p>`;
+            return;
+        }
+
+        listContainer.innerHTML = records.map(item => `
+            <div class="glass-card rounded-[24px] p-5 border border-white/5 flex items-center justify-between gap-4 transition hover:border-amber-500/30">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-400 border border-amber-500/20">
+                        <i data-lucide="activity" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-bold text-white">${escapeHtml(item.source || "Telemetry Dataset")}</h4>
+                        <p class="text-xs text-slate-400 mt-0.5 font-mono">
+                            ${item.total_records || 0} events &bull; Site: ${escapeHtml(item.site_id || "default")} &bull; ${formatTime(item.timestamp)}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-load-telemetry-hist px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 transition" data-session-id="${escapeHtml(item.session_id)}">
+                        Load in Viewer
+                    </button>
+                </div>
+            </div>
+        `).join("");
+
+        listContainer.querySelectorAll(".btn-load-telemetry-hist").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const sId = btn.getAttribute("data-session-id");
+                const targetRecord = records.find(r => r.session_id === sId);
+                if (targetRecord && targetRecord.data) {
+                    renderTelemetryDashboard(targetRecord.data);
+                    showToast(`Loaded telemetry dataset: ${targetRecord.source}`, "info");
+                }
+            });
+        });
+        lucide.createIcons();
+    } catch (err) {
+        listContainer.innerHTML = `<p class="text-xs text-rose-400 text-center py-6">Failed to load history: ${escapeHtml(err.message)}</p>`;
+    }
+}
+

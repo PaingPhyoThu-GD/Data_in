@@ -26,6 +26,7 @@ ENV/
 logs/
 *.log
 frontend/uploads/
+lakehouse/
 
 # IDE caches (preserve shared settings.json, ignore user workspace state)
 .vscode/*

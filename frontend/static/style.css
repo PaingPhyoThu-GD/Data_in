@@ -132,3 +132,92 @@ body {
     backdrop-filter: blur(4px);
 }
 
+/* ========================================================================== */
+/* Survey Extractor Service - Perplexity Aesthetic Styles                      */
+/* ========================================================================== */
+.survey-perplexity-container {
+    border-radius: 32px;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.survey-perplexity-container:hover {
+    border-color: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 20px 40px -15px rgba(16, 185, 129, 0.08);
+}
+
+.survey-tag-pill {
+    transition: all 0.2s ease;
+}
+
+.survey-tag-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px -2px rgba(16, 185, 129, 0.25);
+}
+
+.survey-row:hover {
+    background-color: rgba(255, 255, 255, 0.035);
+}
+
+/* ========================================================================== */
+/* Telemetry & Traffic Intelligence - Perplexity Aesthetic Styles             */
+/* ========================================================================== */
+.telemetry-perplexity-container {
+    border-radius: 32px;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.telemetry-perplexity-container:hover {
+    border-color: rgba(245, 158, 11, 0.28);
+    box-shadow: 0 20px 40px -15px rgba(245, 158, 11, 0.09);
+}
+
+.telemetry-tag-pill {
+    transition: all 0.2s ease;
+}
+
+.telemetry-tag-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px -2px rgba(245, 158, 11, 0.3);
+}
+
+.telemetry-row:hover {
+    background-color: rgba(255, 255, 255, 0.035);
+}
+
+.telemetry-mode-btn.active {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+    border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+.dl-badge-passed {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.dl-badge-warn {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.dl-badge-blocked {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.dl-table-wrap {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+
+

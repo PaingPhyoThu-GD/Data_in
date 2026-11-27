@@ -5,6 +5,8 @@ A modular multi-service platform featuring:
 2. **Telegram HTML Chat Parser**: Complete parser for Telegram Desktop export files (`messages.html`), converting them into clean, structured JSON with full preservation of replies, media paths, message types, and emoji reactions with user metrics and reaction counts.
 3. **Database to JSON Converter**: Universal parser for database exports (`.sql` dumps, `.db`/`.sqlite` SQLite databases, `.csv`/`.tsv` tables, and multi-sheet `.xlsx` Excel workbooks) converting schemas and records into structured JSON.
 4. **YouTube Channel Data to JSON**: Ingests public YouTube channel URLs, handles (`@handle`), or exported HTML/JSON, extracting complete channel metadata (banner, avatar, verified badge, subscribers) and video catalog (durations, view counts, thumbnails, titles) into structured JSON.
+5. **Survey Extractor & Telemetry**: Ingests Google Forms CSV exports (`survey_extractor`) and web traffic logs / Vercel Log Drains / Beacon events (`telemetry`).
+6. **DuckLake Medallion Lakehouse (`src/ducklake/`)**: Parquet-first Bronze, Silver, single-pass DuckDB SQL Quality Gate + Quarantine, and four Gold Marts (`gold_ingestion_overview`, `gold_sales_kpi_mart`, `gold_telegram_engagement_mart`, `gold_web_traffic_mart`), exposed via `scripts/run_lakehouse.py`, `/api/lakehouse/*`, and the `DuckLake` UI tab.
 
 This project features a strictly decoupled architecture with **100% untouched backend packages** and a **modern Single-Page Web Frontend (SPA)** featuring a top-level service switcher allowing effortless switching between services within one web app.
 
