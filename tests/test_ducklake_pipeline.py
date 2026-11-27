@@ -288,6 +288,11 @@ def test_silver_dedup_and_edge_cases(tmp_path: Path) -> None:
     assert report.layer_counts.quarantine_by_entity["survey_runs"] == 1
     assert report.layer_counts.silver_by_entity["surveys"] == 2
 
+    # YouTube: channel + 2 videos (Short with duration_seconds=None passes Quality Gate)
+    assert report.layer_counts.silver_by_entity["youtube_channels"] == 1
+    assert report.layer_counts.silver_by_entity["youtube_videos"] == 2
+    assert report.layer_counts.quarantine_by_entity.get("youtube_videos", 0) == 0
+
     # Telemetry: duplicate UUIDs collapsed (2 unique events total), beacon-only site has NULL p50 latency
     assert report.layer_counts.silver_by_entity["telemetry_events"] == 2
     web_mart = svc.get_mart_preview("gold_web_traffic_mart")
@@ -340,8 +345,13 @@ def test_quality_gate_blocked_preserves_healthy_marts(tmp_path: Path) -> None:
     assert status_after.marts["gold_telegram_engagement_mart"].batch_id == initial_tg_batch
     assert not (lh_dir / "bronze" / "telegram_parser" / f"batch_{second.batch_id}.parquet").exists()
 
-    # Healthy web traffic mart advanced to new batch
+    # Healthy web traffic mart advanced to new batch; gold_ingestion_overview excludes blocked Bronze counts
     assert status_after.marts["gold_web_traffic_mart"].batch_id == second.batch_id
+    overview = svc.get_mart_preview("gold_ingestion_overview")
+    tg_row = next(r for r in overview.rows if r["source_name"] == "telegram_parser")
+    assert tg_row["bronze_records"] == 0
+    assert tg_row["quality_status"] == "BLOCKED"
+    assert tg_row["latest_ingested_at"] is None
     # Quarantine for blocked batch is queryable
     q_tg = svc.get_quarantine(entity="telegram_messages", batch_id=second.batch_id)
     assert q_tg.total >= 1
@@ -364,6 +374,10 @@ def test_full_refresh_runs_history_recovery_and_duckdb_export(tmp_path: Path) ->
         assert cnt == 2
     finally:
         dconn.close()
+
+    # Verify runs_history.jsonl serializes "_rule_id" alias
+    history_lines = svc.config.runs_history_path.read_text(encoding="utf-8").splitlines()
+    assert '"_rule_id"' in history_lines[0]
 
     # Inject malformed line into runs_history.jsonl and verify list_runs skips it
     with open(svc.config.runs_history_path, "a", encoding="utf-8") as fh:

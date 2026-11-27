@@ -22,6 +22,7 @@ from .config import LakehouseConfig
 from .gold import build_gold_marts, export_duckdb_snapshot
 from .models import (
     ALLOWED_MARTS,
+    ALLOWED_SILVER_ENTITIES,
     ALLOWED_SOURCES,
     BatchRunReport,
     LayerCounts,
@@ -32,6 +33,7 @@ from .models import (
     QuarantinePage,
     QualityGateResult,
     QualityStatus,
+    SilverPreviewResponse,
 )
 from .quality import DuckDBSQLQualityGate, ENTITY_TO_SOURCE, QualityGate
 from .silver import build_silver_tables
@@ -114,7 +116,7 @@ class LakehouseService:
         path = self.config.runs_history_path
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
-            fh.write(report.model_dump_json() + "\n")
+            fh.write(report.model_dump_json(by_alias=True) + "\n")
 
     def _prune_old_versions(self, manifest: ManifestState) -> None:
         keep_n = max(1, self.config.keep_last)
@@ -235,13 +237,25 @@ class LakehouseService:
                     )
                 )
 
-                # Compute total Bronze rows across committed + staged files per source
+                # Determine per-source blocked flags before Gold overview so uncommitted Bronze counts are excluded
+                blocked_sources = {
+                    ENTITY_TO_SOURCE[ent]
+                    for ent, st in gate_result.entity_statuses.items()
+                    if st == QualityStatus.BLOCKED and ent in ENTITY_TO_SOURCE
+                }
+
+                # Compute total Bronze rows across committed + non-blocked staged files per source
                 total_bronze_counts: dict[str, int] = {}
                 for src, files in bronze_files_by_source.items():
-                    if not files:
+                    active_files = [
+                        p
+                        for p in files
+                        if not (src in blocked_sources and p == bronze_res.staged_files.get(src))
+                    ]
+                    if not active_files:
                         total_bronze_counts[src] = 0
                     else:
-                        paths_sql = ", ".join(f"'{p.as_posix().replace(chr(39), chr(39)*2)}'" for p in files)
+                        paths_sql = ", ".join(f"'{p.as_posix().replace(chr(39), chr(39)*2)}'" for p in active_files)
                         total_bronze_counts[src] = int(
                             conn.execute(f"SELECT COUNT(*) FROM read_parquet([{paths_sql}])").fetchone()[0]  # type: ignore[index]
                         )
@@ -259,20 +273,12 @@ class LakehouseService:
             finally:
                 conn.close()
 
-            # Determine per-source blocked flags
-            blocked_sources = {
-                ENTITY_TO_SOURCE[ent]
-                for ent, st in gate_result.entity_statuses.items()
-                if st == QualityStatus.BLOCKED and ent in ENTITY_TO_SOURCE
-            }
-
             for src in selected_sources:
                 if src in blocked_sources:
                     # Delete uncommitted Bronze file for blocked source
                     staged = bronze_res.staged_files.get(src)
                     if staged and staged.exists():
                         staged.unlink(missing_ok=True)
-                    total_bronze_counts[src] = max(0, total_bronze_counts[src] - bronze_res.row_counts_by_source.get(src, 0))
                 else:
                     watermarks[src] = bronze_res.pending_watermarks.get(src, watermarks.get(src, {}))
                     staged = bronze_res.staged_files.get(src)
@@ -341,7 +347,7 @@ class LakehouseService:
                         ):
                             committed_silver_files[ent] = candidate
                 committed_q_files = {
-                    ent: self.config.lakehouse_dir / paths[-1]
+                    ent: [self.config.lakehouse_dir / p for p in paths]
                     for ent, paths in manifest.quarantine_batches.items()
                     if paths
                 }
@@ -448,6 +454,27 @@ class LakehouseService:
         finally:
             conn.close()
 
+    @staticmethod
+    def _query_parquet_page(
+        parquet_path: Path,
+        limit: int,
+        offset: int,
+    ) -> tuple[int, list[str], list[dict[str, Any]]]:
+        """Read a paginated slice of rows from a Parquet file via a short-lived :memory: DuckDB connection."""
+        conn = duckdb.connect(":memory:")
+        try:
+            esc = parquet_path.as_posix().replace("'", "''")
+            total = int(conn.execute(f"SELECT COUNT(*) FROM read_parquet('{esc}')").fetchone()[0])  # type: ignore[index]
+            cur = conn.execute(f"SELECT * FROM read_parquet('{esc}') LIMIT ? OFFSET ?", [limit, offset])
+            cols = [desc[0] for desc in cur.description]
+            rows = [
+                {c: (v.isoformat() if hasattr(v, "isoformat") else v) for c, v in zip(cols, rec)}
+                for rec in cur.fetchall()
+            ]
+            return total, cols, rows
+        finally:
+            conn.close()
+
     def get_mart_preview(
         self,
         mart_name: str,
@@ -468,26 +495,44 @@ class LakehouseService:
         if not parquet_path.exists():
             return MartPreviewResponse(mart_name=mart_name, batch_id=pointer.batch_id, total=0, limit=limit, offset=offset)
 
-        conn = duckdb.connect(":memory:")
-        try:
-            esc = parquet_path.as_posix().replace("'", "''")
-            total = int(conn.execute(f"SELECT COUNT(*) FROM read_parquet('{esc}')").fetchone()[0])  # type: ignore[index]
-            cur = conn.execute(f"SELECT * FROM read_parquet('{esc}') LIMIT ? OFFSET ?", [limit, offset])
-            cols = [desc[0] for desc in cur.description]
-            rows = []
-            for rec in cur.fetchall():
-                row_dict: dict[str, Any] = {}
-                for c, v in zip(cols, rec):
-                    row_dict[c] = v.isoformat() if hasattr(v, "isoformat") else v
-                rows.append(row_dict)
-            return MartPreviewResponse(
-                mart_name=mart_name,
-                batch_id=pointer.batch_id,
-                total=total,
-                limit=limit,
-                offset=offset,
-                columns=cols,
-                rows=rows,
-            )
-        finally:
-            conn.close()
+        total, cols, rows = self._query_parquet_page(parquet_path, limit, offset)
+        return MartPreviewResponse(
+            mart_name=mart_name,
+            batch_id=pointer.batch_id,
+            total=total,
+            limit=limit,
+            offset=offset,
+            columns=cols,
+            rows=rows,
+        )
+
+    def get_silver_preview(
+        self,
+        entity: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> SilverPreviewResponse:
+        """Query an allowlisted committed Silver entity Parquet snapshot via :memory: DuckDB."""
+        if entity not in ALLOWED_SILVER_ENTITIES:
+            raise KeyError(f"Unknown Silver entity: {entity!r}")
+
+        manifest = self._load_manifest()
+        ver = manifest.silver_versions.get(entity)
+        assert self.config.silver_dir is not None
+        if ver is None:
+            return SilverPreviewResponse(entity=entity, version=None, total=0, limit=limit, offset=offset)
+
+        parquet_path = self.config.silver_dir / ver / f"silver_{entity}.parquet"
+        if not parquet_path.exists():
+            return SilverPreviewResponse(entity=entity, version=ver, total=0, limit=limit, offset=offset)
+
+        total, cols, rows = self._query_parquet_page(parquet_path, limit, offset)
+        return SilverPreviewResponse(
+            entity=entity,
+            version=ver,
+            total=total,
+            limit=limit,
+            offset=offset,
+            columns=cols,
+            rows=rows,
+        )

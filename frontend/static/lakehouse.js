@@ -8,6 +8,9 @@
     let _martOffset = 0;
     const _martLimit = 50;
     let _martTotal = 0;
+    let _silverOffset = 0;
+    const _silverLimit = 50;
+    let _silverTotal = 0;
 
     function _setBadge(statusText) {
         const badge = document.getElementById("ducklakeStatusBadge");
@@ -120,6 +123,23 @@
         );
     }
 
+    async function loadSilver() {
+        const sel = document.getElementById("ducklakeSilverSelect");
+        const entity = sel ? sel.value : "ocr_extractions";
+        const res = await fetch(`/api/lakehouse/silver/${encodeURIComponent(entity)}?limit=${_silverLimit}&offset=${_silverOffset}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        _silverTotal = data.total || 0;
+        const info = document.getElementById("ducklakeSilverPageInfo");
+        if (info) info.textContent = `${data.total} rows (offset ${_silverOffset})`;
+        _renderTable(
+            document.getElementById("ducklakeSilverTable"),
+            data.columns || [],
+            data.rows || [],
+            "No Silver rows committed yet. Run an Ingestion Batch above."
+        );
+    }
+
     async function loadQuarantine() {
         const sel = document.getElementById("ducklakeQuarantineEntity");
         const entity = sel ? sel.value : "";
@@ -184,7 +204,8 @@
             _setBadge(data.overall_status);
             _renderLayerCards(data.layer_counts || {});
             _martOffset = 0;
-            await Promise.all([loadMart(), loadQuarantine(), loadRunsHistory()]);
+            _silverOffset = 0;
+            await Promise.all([loadMart(), loadSilver(), loadQuarantine(), loadRunsHistory()]);
             if (typeof showToast === "function") showToast(`Batch ${data.batch_id}: ${data.overall_status}`, "success");
         } finally {
             if (btn) btn.disabled = false;
@@ -209,11 +230,26 @@
                     loadMart();
                 }
             });
+            document.getElementById("ducklakeSilverSelect")?.addEventListener("change", () => {
+                _silverOffset = 0;
+                loadSilver();
+            });
+            document.getElementById("ducklakeSilverPrev")?.addEventListener("click", () => {
+                _silverOffset = Math.max(0, _silverOffset - _silverLimit);
+                loadSilver();
+            });
+            document.getElementById("ducklakeSilverNext")?.addEventListener("click", () => {
+                if (_silverOffset + _silverLimit < _silverTotal) {
+                    _silverOffset += _silverLimit;
+                    loadSilver();
+                }
+            });
             document.getElementById("ducklakeQuarantineEntity")?.addEventListener("change", loadQuarantine);
             document.getElementById("btnRefreshDuckLakeHistory")?.addEventListener("click", loadRunsHistory);
         }
         loadStatus();
         loadMart();
+        loadSilver();
         loadQuarantine();
     };
 

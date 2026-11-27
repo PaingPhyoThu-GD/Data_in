@@ -11,13 +11,14 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
 from ducklake import (
     ALLOWED_MARTS,
+    ALLOWED_SILVER_ENTITIES,
     ALLOWED_SOURCES,
     BatchRunReport,
     LakehouseLockError,
     LakehouseService,
     ManifestState,
 )
-from ducklake.models import MartPreviewResponse, QuarantinePage, RunBatchRequest
+from ducklake.models import MartPreviewResponse, QuarantinePage, RunBatchRequest, SilverPreviewResponse
 
 router = APIRouter(prefix="/api/lakehouse", tags=["lakehouse"])
 
@@ -98,3 +99,15 @@ async def get_lakehouse_mart(
     if mart_name not in ALLOWED_MARTS:
         raise HTTPException(status_code=404, detail=f"Unknown Gold Mart: {mart_name!r}")
     return await asyncio.to_thread(service.get_mart_preview, mart_name=mart_name, limit=limit, offset=offset)
+
+
+@router.get("/silver/{entity}", response_model=SilverPreviewResponse)
+async def get_lakehouse_silver(
+    entity: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    service: LakehouseService = Depends(get_lakehouse_service),
+) -> SilverPreviewResponse:
+    if entity not in ALLOWED_SILVER_ENTITIES:
+        raise HTTPException(status_code=404, detail=f"Unknown Silver entity: {entity!r}")
+    return await asyncio.to_thread(service.get_silver_preview, entity=entity, limit=limit, offset=offset)

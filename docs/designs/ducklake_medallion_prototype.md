@@ -140,7 +140,7 @@ Upstream Sources (Read-Only)
    * `scripts/run_lakehouse.py`: Thin CLI entrypoint invoking `LakehouseService.run_batch()` and printing structured summaries (exit code `0` for `PASSED`/`PASSED_WITH_QUARANTINE`, `2` for `BLOCKED`, `1` for unexpected error).
    * `frontend/lakehouse_routes.py`: FastAPI `APIRouter` mounted into `frontend/app.py` at `/api/lakehouse/*`:
      * `POST /api/lakehouse/run`: Runs the blocking `run_batch()` call inside `asyncio.to_thread` under the single-writer lock, returning `200 OK` with `BatchRunReport` (or `409 Conflict` if another batch holds the lock).
-     * `GET /api/lakehouse/status`: Returns current `ManifestState`, layer row counts, and latest Quality Gate summary.
+     * `GET /api/lakehouse/status`: Returns current `ManifestState` (including `latest_status` and `layer_counts`; per-check `QualityGateResult` details are returned on `BatchRunReport` via `/run` and `/runs`).
      * `GET /api/lakehouse/runs`: Returns paginated `BatchRunReport` history.
      * `GET /api/lakehouse/quarantine`: Returns paginated quarantined rows filtered by allowlisted `entity` and regex-validated (`^[a-f0-9_-]+$`) `batch_id`.
      * `GET /api/lakehouse/marts/{mart_name}`: Returns paginated rows (`limit <= 200`, `offset`) and column metadata for the four allowed Gold Marts (`404` for unknown mart names; no arbitrary SQL input).
@@ -160,7 +160,7 @@ Upstream Sources (Read-Only)
 
 ### Gold Mart Definitions (v1)
 
-1. **`gold_ingestion_overview`**: Per-source summary of raw Bronze records, deduplicated Silver Entity Records, quarantined rows, `_is_test_artifact` count, and latest `_ingested_at`.
+1. **`gold_ingestion_overview`**: Per-source summary of raw Bronze records, deduplicated Silver Entity Records (using one representative entity per source: `ocr_extractions`, `telegram_messages`, `database_rows`, `youtube_videos`, `surveys`, `telemetry_events`), quarantined rows, `_is_test_artifact` count, and latest `_ingested_at` (`NULL` when empty).
 2. **`gold_sales_kpi_mart`**: Daily (`order_date`) and customer-segment (`LEFT JOIN silver_sales_customers ON customer_id`, defaulting missing customers/segments to `'unknown'`) order count, gross revenue, and average order value computed from `silver_sales_orders` (returns an empty result set without error if no conforming sales tables exist).
 3. **`gold_telegram_engagement_mart`**: Per-chat and per-sender (`COALESCE(NULLIF(from_name, ''), 'Unknown')`) message volume, reply count, media attachment count, and reaction totals (`SUM(reaction_count)`) computed strictly from non-`Service Notice` records.
 4. **`gold_web_traffic_mart`**: Daily per-`site_id` pageviews, unique deduplicated `visitor_hash` count, `session_id` count, median/P95 latency (`quantile_cont` filtered to `source_mode != 'beacon'` so zero-latency client beacons do not skew server percentiles), and 4xx/5xx error rate from `silver_telemetry_events`.
@@ -296,7 +296,7 @@ The implementation is partitioned into three incremental phases, each leaving th
 #### 4. [`src/ducklake/__init__.py`](../../src/ducklake/__init__.py) (Create)
 
 *   **Type / Scope**: Python package entrypoint.
-*   **Proposed Changes & Rationale**: Export `LakehouseConfig`, `LakehouseService`, `QualityStatus`, `BatchRunReport`, `QualityGateResult`, and `ManifestState` so CLI, FastAPI, and tests share one public package interface.
+*   **Proposed Changes & Rationale**: Export `ALLOWED_MARTS`, `ALLOWED_SOURCES`, `BatchRunReport`, `LakehouseConfig`, `LakehouseLockError`, `LakehouseService`, `ManifestState`, `QualityGateResult`, and `QualityStatus` so CLI, FastAPI, and tests share one public package interface.
 
 #### 5. [`src/ducklake/config.py`](../../src/ducklake/config.py) (Create)
 
@@ -317,7 +317,7 @@ The implementation is partitioned into three incremental phases, each leaving th
 *   **Proposed Changes & Rationale**: Define exact schemas and constants:
     *   `ALLOWED_SOURCES: tuple[str, ...]` = `("gemini_ocr", "telegram_parser", "database_parser", "youtube_parser", "survey_extractor", "telemetry")`
     *   `ALLOWED_MARTS: tuple[str, ...]` = `("gold_ingestion_overview", "gold_sales_kpi_mart", "gold_telegram_engagement_mart", "gold_web_traffic_mart")`
-    *   `QUARANTINE_ENTITIES: tuple[str, ...]` = `("ocr_extractions", "telegram_messages", "sales_orders", "youtube_channels", "youtube_videos", "survey_runs", "telemetry_events")`
+    *   `QUARANTINE_ENTITIES: tuple[str, ...]` = `("ocr_extractions", "telegram_messages", "sales_orders", "youtube_videos", "survey_runs", "telemetry_events")`
     *   `QualityStatus(str, Enum)`: `"PASSED"`, `"PASSED_WITH_QUARANTINE"`, `"BLOCKED"`.
     *   `BronzeEnvelope`: `_ingest_id: str`, `_batch_id: str`, `_ingested_at: str` (UTC ISO), `_source_name: str`, `_source_origin_type: Literal["jsonl", "sqlite", "landing_json"]`, `_source_file: str` (filename relative to source root), `_record_key: str`, `_payload_hash: str`, `_is_test_artifact: bool`, `payload_json: str`.
     *   `SourceIngestSummary`: `source_name: str`, `scanned_count: int`, `ingested_count: int`, `skipped_unchanged_count: int`, `bronze_file: Optional[str] = None`.
@@ -325,7 +325,7 @@ The implementation is partitioned into three incremental phases, each leaving th
     *   `QualityGateResult`: `overall_status: QualityStatus`, `entity_statuses: dict[str, QualityStatus]`, `checks: list[QualityCheckResult]`, `total_quarantined: int`.
     *   `LayerCounts`: `bronze_by_source: dict[str, int]`, `silver_by_entity: dict[str, int]`, `quarantine_by_entity: dict[str, int]`, `gold_by_mart: dict[str, int]`.
     *   `MartPointer`: `mart_name: str`, `batch_id: str`, `parquet_path: str`, `row_count: int`, `updated_at: str`.
-    *   `ManifestState`: `schema_version: int = 1`, `latest_batch_id: Optional[str] = None`, `updated_at: Optional[str] = None`, `committed_bronze_batches: dict[str, list[str]]` (per source), `silver_versions: dict[str, str]` (entity -> `v_<batch_id>` dir), `quarantine_batches: dict[str, list[str]]` (entity -> batch paths), `marts: dict[str, MartPointer]`, `layer_counts: LayerCounts`.
+    *   `ManifestState`: `schema_version: int = 1`, `latest_batch_id: Optional[str] = None`, `latest_status: Optional[QualityStatus] = None`, `updated_at: Optional[str] = None`, `committed_bronze_batches: dict[str, list[str]]` (per source), `silver_versions: dict[str, str]` (entity -> `v_<batch_id>` dir), `quarantine_batches: dict[str, list[str]]` (entity -> batch paths), `marts: dict[str, MartPointer]`, `layer_counts: LayerCounts`.
     *   `BatchRunReport`: `batch_id: str` (lowercase `YYYYmmdd_HHMMSS_<8hex>`, matching `^[a-f0-9_-]+$`), `started_at: str`, `completed_at: str`, `full_refresh: bool`, `overall_status: QualityStatus`, `sources: list[SourceIngestSummary]`, `quality: QualityGateResult`, `layer_counts: LayerCounts`, `exported_duckdb_path: Optional[str] = None`, `warnings: list[str] = Field(default_factory=list)`.
     *   `RunBatchRequest`: `sources: Optional[list[str]] = None`, `full_refresh: bool = False`, `export_duckdb: Optional[bool] = None`.
     *   `QuarantinePage`: `total: int`, `limit: int`, `offset: int`, `entities: list[str]`, `rows: list[dict[str, Any]]`.
@@ -337,8 +337,8 @@ The implementation is partitioned into three incremental phases, each leaving th
 *   **Proposed Changes & Rationale**:
     *   Define `SourceAdapter(Protocol)` with `source_name: str` and `read_records(config: LakehouseConfig, batch_id: str, ingested_at: str) -> list[BronzeEnvelope]`.
     *   Implement canonical SHA-256 hashing (`hash_payload(obj)` via `json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"))`).
-    *   Implement `_iter_jsonl_records(path: Path)`: copies `path` bytes into a temporary memory buffer before splitting lines so concurrent `frontend/app.py` rewrites do not cause torn reads, parses lines in Python (supporting objects exceeding DuckDB's 16 MB `maximum_object_size`), and skips blank or trailing incomplete JSON lines while logging a warning.
-    *   Implement `_iter_landing_records(landing_dir: Path, source_name: str)`: reads `landing_dir / source_name / "*.json"`, unwrapping both single JSON objects and top-level JSON arrays, and extracting `record.get("data", record)` where upstream CLI exports omit the log wrapper.
+    *   Implement `iter_jsonl_records(path: Path)`: copies `path` bytes into a temporary memory buffer before splitting lines so concurrent `frontend/app.py` rewrites do not cause torn reads, parses lines in Python (supporting objects exceeding DuckDB's 16 MB `maximum_object_size`), and skips blank or trailing incomplete JSON lines while logging a warning.
+    *   Implement `iter_landing_records(landing_dir: Path, source_name: str)`: reads `landing_dir / source_name / "*.json"`, unwrapping both single JSON objects and top-level JSON arrays; individual adapters unwrap `record.get("data", record)` (or `recent_events` for `telemetry`) where upstream CLI exports omit the log wrapper.
 
 #### 8. [`src/ducklake/adapters/gemini_ocr.py`](../../src/ducklake/adapters/gemini_ocr.py) (Create)
 
@@ -394,7 +394,7 @@ The implementation is partitioned into three incremental phases, each leaving th
 *   **Type / Scope**: Single-pass Silver DuckDB SQL transformations, Quality Gate, and Quarantine writer.
 *   **Proposed Changes & Rationale**:
     *   Define `QualityGate(Protocol)` and `DuckDBSQLQualityGate` in `quality.py`, executed inside the same short-lived `:memory:` DuckDB session (`SET memory_limit = ...`) as `silver.py` so each entity is classified and written to Parquet **once** (no double Silver rewrite).
-    *   `silver.py` scans only `manifest.committed_bronze_batches[source]` plus that source's staged `batch_<batch_id>.parquet` (emitting empty 0-row typed Parquet files when a source has zero Bronze batches).
+    *   `silver.py` scans only `manifest.committed_bronze_batches[source]` plus that source's staged `batch_<batch_id>.parquet` to build typed `:memory:` TEMP tables, while `quality.py` materializes all Silver Parquet files (emitting empty 0-row typed Parquet files when a source has zero Bronze batches).
     *   Exact Silver column contracts and deduplication keys (latest `_ingested_at` wins via `ROW_NUMBER()`):
         *   `silver_ocr_extractions`: `(run_key VARCHAR, filename VARCHAR, image_index INTEGER, text VARCHAR, language VARCHAR, confidence DOUBLE, error_message VARCHAR, processed_at TIMESTAMPTZ, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — key `(run_key, filename, image_index)` with `filename = Path(f).name`.
         *   `silver_telegram_service_notices`: `(chat_title VARCHAR, message_id BIGINT, notice_date_text VARCHAR, notice_text VARCHAR, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — `type = 'service'` separated before message checks.
@@ -403,7 +403,7 @@ The implementation is partitioned into three incremental phases, each leaving th
         *   `silver_database_tables`: `(database_name VARCHAR, table_name VARCHAR, format VARCHAR, row_count INTEGER, columns_json VARCHAR, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — key `(database_name, table_name)`.
         *   `silver_database_rows`: `(database_name VARCHAR, table_name VARCHAR, _row_hash VARCHAR, row_payload_json VARCHAR, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — key `(database_name, table_name, _row_hash)`.
         *   `silver_sales_customers` *(conditional)*: `(customer_id VARCHAR, customer_name VARCHAR, segment VARCHAR, email VARCHAR, city VARCHAR, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — key `customer_id`, projecting `COALESCE(name, customer_name)` and `COALESCE(segment, 'unknown')`.
-        *   `silver_sales_orders` *(conditional)*: `(order_id VARCHAR, customer_id VARCHAR, order_date DATE, total_amount DOUBLE, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — key `order_id`, projecting `COALESCE(total_amount, order_amount)`.
+        *   `silver_sales_orders` *(conditional)*: `(order_id VARCHAR, customer_id VARCHAR, order_date DATE, total_amount DOUBLE, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — key `COALESCE(order_id, '__null__' || CAST(rowid AS VARCHAR))`, projecting `COALESCE(total_amount, order_amount)`.
         *   `silver_youtube_channels`: `(channel_key VARCHAR, channel_id VARCHAR, channel_name VARCHAR, handle VARCHAR, subscriber_count BIGINT, total_videos_count INTEGER, is_verified BOOLEAN, custom_url VARCHAR, scraped_at TIMESTAMPTZ, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — key `COALESCE(channel_id, handle, channel_name)`.
         *   `silver_youtube_videos`: `(video_id VARCHAR, channel_key VARCHAR, title VARCHAR, url VARCHAR, duration_seconds INTEGER, view_count BIGINT, published_time_text VARCHAR, is_short BOOLEAN, thumbnail_url VARCHAR, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — key `video_id`.
         *   `silver_surveys`: `(survey_id VARCHAR, title VARCHAR, file_name VARCHAR, created_at TIMESTAMPTZ, total_questions INTEGER, total_responses INTEGER, valid_responses INTEGER, invalid_responses INTEGER, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — key `survey_id`.
@@ -412,13 +412,13 @@ The implementation is partitioned into three incremental phases, each leaving th
         *   `silver_survey_answers`: `(survey_id VARCHAR, response_id VARCHAR, question_id VARCHAR, answer_text VARCHAR, answer_list_json VARCHAR, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ)` — key `(survey_id, response_id, question_id)`.
         *   `silver_telemetry_events`: `(event_id VARCHAR, site_id VARCHAR, source_mode VARCHAR, event_ts TIMESTAMPTZ, timestamp_ms BIGINT, visitor_hash VARCHAR, session_id VARCHAR, path VARCHAR, method VARCHAR, status_code INTEGER, latency_ms DOUBLE, duration_seconds DOUBLE, referrer_domain VARCHAR, country_code VARCHAR, browser VARCHAR, os VARCHAR, device_type VARCHAR, _batch_id VARCHAR, _ingested_at TIMESTAMPTZ, _is_test_artifact BOOLEAN)` — deduplicated by `(site_id, timestamp_ms, path, method, visitor_hash, session_id, status_code, latency_ms)`.
     *   Quarantine & Quality Gate `_rule_id` contracts (written to `lakehouse/quarantine/<entity>/v_<batch_id>/quarantine.parquet` with `_batch_id`, `_rule_id`, `_failure_reason`, `_quarantined_at`, `raw_payload_json`):
-        *   `ocr_extractions`: `OCR_ITEM_ERROR` (`error_message IS NOT NULL`), `OCR_CONFIDENCE_RANGE` (`confidence < 0.0 OR confidence > 1.0`).
-        *   `telegram_messages`: `TG_INVALID_DATE` (`message_ts IS NULL`), `TG_NEGATIVE_REACTIONS` (`reaction_count < 0`).
+        *   `ocr_extractions`: `OCR_ITEM_ERROR` (`error_message IS NOT NULL`), `OCR_CONFIDENCE_RANGE` (`confidence IS NULL OR confidence < 0.0 OR confidence > 1.0`).
+        *   `telegram_messages`: `TG_INVALID_DATE` (`message_ts IS NULL`), `TG_NEGATIVE_REACTIONS` (`reaction_count IS NULL OR reaction_count < 0`).
         *   `sales_orders`: `DB_NULL_ORDER_ID` (`order_id IS NULL OR trim(order_id) = ''`), `DB_NON_POSITIVE_AMOUNT` (`total_amount IS NULL OR total_amount <= 0`).
-        *   `youtube_channels` / `youtube_videos`: `YT_NEGATIVE_DURATION` (`duration_seconds < 0`), `YT_NEGATIVE_VIEWS` (`view_count < 0`).
+        *   `youtube_videos`: `YT_NEGATIVE_DURATION` (`duration_seconds IS NOT NULL AND duration_seconds < 0`), `YT_NEGATIVE_VIEWS` (`view_count IS NOT NULL AND view_count < 0`).
         *   `survey_runs`: `SURVEY_TRUNCATED_RUN` (`captured_responses < valid_responses` — quarantines truncated Extraction Run metadata in `survey_runs` while keeping complete survey runs in `silver_surveys`/`responses`/`answers`).
-        *   `telemetry_events`: `TELEMETRY_INVALID_STATUS` (`status_code < 100 OR status_code > 599`), `TELEMETRY_NEGATIVE_LATENCY` (`latency_ms < 0`).
-    *   Dataset circuit-breaker rule per entity: conditional entities (`silver_sales_customers`, `silver_sales_orders`) pass with `0` rows when no conforming sales schema exists; non-conditional entities trigger `BLOCKED` if required schema columns are missing or `pre_commit_rows > 0 AND valid_rows == 0`. `survey_runs` is a Quarantine audit entity whose failures emit `PASSED_WITH_QUARANTINE` unless all survey runs in `silver_surveys` fail.
+        *   `telemetry_events`: `TELEMETRY_INVALID_STATUS` (`status_code IS NULL OR status_code < 100 OR status_code > 599`), `TELEMETRY_NEGATIVE_LATENCY` (`latency_ms IS NULL OR latency_ms < 0`).
+    *   Dataset circuit-breaker rule per entity: `sales_customers` is materialized as a passthrough entity while `sales_orders` is conditional and passes with `0` rows when no conforming sales schema exists; non-conditional entities trigger `BLOCKED` if `pre_commit_rows > 0 AND valid_rows == 0` (`silver.py` normalizes into fixed typed TEMP schemas upfront). `survey_runs` is a Quarantine audit entity whose failures emit `PASSED_WITH_QUARANTINE` unless all survey runs in `silver_surveys` fail.
 
 #### 17. [`src/ducklake/gold.py`](../../src/ducklake/gold.py) (Create)
 
@@ -437,7 +437,7 @@ The implementation is partitioned into three incremental phases, each leaving th
     *   `LakehouseService(config: LakehouseConfig)`:
         *   **Cross-process OS lock**: Open `config.write_lock_path`, write/ensure 1 byte exists (`b"0"`) before acquiring non-blocking `msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)` on Windows (`os.name == "nt"`) or `fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)` on POSIX; raise `LakehouseLockError` immediately if held.
         *   **`run_batch(sources=None, full_refresh=False, export_duckdb=None)`**:
-            *   If `full_refresh=True`: clears prior `watermarks`, `bronze/`, `silver/`, `gold/`, and resets `latest_manifest.json` for selected `sources` (or all sources when `sources is None`), while keeping historical `quarantine/` audit files or clearing when full lakehouse refresh is requested.
+            *   If `full_refresh=True`: clears `watermarks`, `committed_bronze_batches`, and `bronze/<source>/` for selected `sources`; when all `ALLOWED_SOURCES` are refreshed, also resets `marts`, `silver_versions`, `quarantine_batches`, and `layer_counts` in `latest_manifest.json` (old `silver/v_*` and `gold/v_*` directories are cleaned up by `_prune_old_versions`, while up to 10 `quarantine/` directories remain on disk).
             *   When `sources` is a subset, Silver/Gold read committed Bronze batches for unselected sources so cross-source `gold_ingestion_overview` stays complete.
             *   Per-source/per-mart commit: for any source/entity whose Quality Gate status is `PASSED` or `PASSED_WITH_QUARANTINE`, register its new `batch_<batch_id>.parquet` in `committed_bronze_batches[source]`, update `watermarks[source]`, update `silver_versions[entity]`, and update `marts[mart_name]`. For any `BLOCKED` entity, delete that source's uncommitted `batch_<batch_id>.parquet`, keep its prior `watermarks[source]` and `marts[mart_name]` unchanged, and record `quarantine_batches[entity]` so `GET /api/lakehouse/quarantine` displays the `BLOCKED` failures immediately.
             *   Atomically write `watermarks.json` and `latest_manifest.json` via temp-file `os.replace`, append `BatchRunReport` JSON line to `runs_history.jsonl`, and prune `silver/` and `gold/` `v_<batch_id>` directories keeping `keep_last` plus any manifest-pinned directories (ignoring transient `PermissionError` on Windows). Quarantine directories retain `max(keep_last, 10)` batches so `BLOCKED` diagnostics survive consecutive runs.

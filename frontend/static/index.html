@@ -1541,6 +1541,37 @@
                 <div id="ducklakeMartTable" class="dl-table-wrap overflow-x-auto border border-slate-800 rounded-2xl"></div>
             </section>
 
+            <!-- Silver Entity Data Explorer -->
+            <section class="bg-slate-900/60 border border-slate-800 rounded-[32px] p-6 sm:p-8 flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <h3 class="text-base font-black text-white">Silver Data Preview</h3>
+                    <div class="flex items-center gap-3">
+                        <select id="ducklakeSilverSelect" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200">
+                            <option value="ocr_extractions">ocr_extractions</option>
+                            <option value="telegram_messages">telegram_messages</option>
+                            <option value="telegram_service_notices">telegram_service_notices</option>
+                            <option value="telegram_reactions">telegram_reactions</option>
+                            <option value="database_tables">database_tables</option>
+                            <option value="database_rows">database_rows</option>
+                            <option value="sales_customers">sales_customers</option>
+                            <option value="sales_orders">sales_orders</option>
+                            <option value="youtube_channels">youtube_channels</option>
+                            <option value="youtube_videos">youtube_videos</option>
+                            <option value="surveys">surveys</option>
+                            <option value="survey_questions">survey_questions</option>
+                            <option value="survey_responses">survey_responses</option>
+                            <option value="survey_answers">survey_answers</option>
+                            <option value="survey_runs">survey_runs</option>
+                            <option value="telemetry_events">telemetry_events</option>
+                        </select>
+                        <button type="button" id="ducklakeSilverPrev" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs text-slate-300 hover:text-white">Prev</button>
+                        <span id="ducklakeSilverPageInfo" class="text-xs text-slate-400 font-mono">0 rows</span>
+                        <button type="button" id="ducklakeSilverNext" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs text-slate-300 hover:text-white">Next</button>
+                    </div>
+                </div>
+                <div id="ducklakeSilverTable" class="dl-table-wrap overflow-x-auto border border-slate-800 rounded-2xl"></div>
+            </section>
+
             <!-- Quarantine Inspector -->
             <section class="bg-slate-900/60 border border-slate-800 rounded-[32px] p-6 sm:p-8 flex flex-col gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-4">
@@ -1550,7 +1581,6 @@
                         <option value="ocr_extractions">ocr_extractions</option>
                         <option value="telegram_messages">telegram_messages</option>
                         <option value="sales_orders">sales_orders</option>
-                        <option value="youtube_channels">youtube_channels</option>
                         <option value="youtube_videos">youtube_videos</option>
                         <option value="survey_runs">survey_runs</option>
                         <option value="telemetry_events">telemetry_events</option>

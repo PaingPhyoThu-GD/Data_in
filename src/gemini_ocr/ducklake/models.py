@@ -28,8 +28,26 @@ QUARANTINE_ENTITIES: tuple[str, ...] = (
     "ocr_extractions",
     "telegram_messages",
     "sales_orders",
+    "youtube_videos",
+    "survey_runs",
+    "telemetry_events",
+)
+
+ALLOWED_SILVER_ENTITIES: tuple[str, ...] = (
+    "ocr_extractions",
+    "telegram_messages",
+    "telegram_service_notices",
+    "telegram_reactions",
+    "database_tables",
+    "database_rows",
+    "sales_customers",
+    "sales_orders",
     "youtube_channels",
     "youtube_videos",
+    "surveys",
+    "survey_questions",
+    "survey_responses",
+    "survey_answers",
     "survey_runs",
     "telemetry_events",
 )
@@ -162,6 +180,18 @@ class MartPreviewResponse(BaseModel):
 
     mart_name: str
     batch_id: Optional[str] = None
+    total: int = 0
+    limit: int = 50
+    offset: int = 0
+    columns: list[str] = Field(default_factory=list)
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SilverPreviewResponse(BaseModel):
+    """Paginated response for GET /api/lakehouse/silver/{entity}."""
+
+    entity: str
+    version: Optional[str] = None
     total: int = 0
     limit: int = 50
     offset: int = 0

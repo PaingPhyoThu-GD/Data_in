@@ -39,6 +39,10 @@ def test_api_status_empty_before_first_batch(lakehouse_client: tuple[TestClient,
     assert mart_resp.status_code == 200
     assert mart_resp.json()["total"] == 0
 
+    silver_resp = client.get("/api/lakehouse/silver/ocr_extractions")
+    assert silver_resp.status_code == 200
+    assert silver_resp.json()["total"] == 0
+
 
 def test_api_run_and_read_marts_quarantine_runs(lakehouse_client: tuple[TestClient, Path, Path]) -> None:
     client, _, _ = lakehouse_client
@@ -60,12 +64,21 @@ def test_api_run_and_read_marts_quarantine_runs(lakehouse_client: tuple[TestClie
     assert mart_resp.status_code == 200
     assert mart_resp.json()["total"] == 6
 
+    silver_resp = client.get("/api/lakehouse/silver/ocr_extractions?limit=50&offset=0")
+    assert silver_resp.status_code == 200
+    silver_data = silver_resp.json()
+    assert silver_data["total"] >= 1
+    assert len(silver_data["rows"]) >= 1
+    assert "text" in silver_data["columns"]
+
 
 def test_api_validation_errors_and_lock_conflict(lakehouse_client: tuple[TestClient, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
     client, _, _ = lakehouse_client
 
     assert client.get("/api/lakehouse/marts/unknown_mart").status_code == 404
     assert client.get("/api/lakehouse/marts/gold_ingestion_overview?limit=201").status_code == 422
+    assert client.get("/api/lakehouse/silver/unknown_entity").status_code == 404
+    assert client.get("/api/lakehouse/silver/ocr_extractions?limit=201").status_code == 422
     assert client.get("/api/lakehouse/quarantine?entity=invalid_entity").status_code == 422
     assert client.get("/api/lakehouse/quarantine?batch_id=../bad").status_code == 422
     assert client.post("/api/lakehouse/run", json={"sources": ["bad_source"]}).status_code == 422

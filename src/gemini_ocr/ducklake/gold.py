@@ -81,7 +81,7 @@ def build_gold_marts(
         status_val = gate_result.entity_statuses.get(q_ent, QualityStatus.PASSED).value
         conn.execute(
             "INSERT INTO gold_ingestion_overview VALUES (?, ?, ?, ?, ?, ?, TRY_CAST(? AS TIMESTAMPTZ))",
-            (src, b_cnt, s_cnt, q_cnt, test_cnt, status_val, max_ts or ingested_at),
+            (src, b_cnt, s_cnt, q_cnt, test_cnt, status_val, max_ts),
         )
 
     overview_sorted = "SELECT * FROM gold_ingestion_overview ORDER BY source_name"
@@ -159,7 +159,7 @@ def build_gold_marts(
 def export_duckdb_snapshot(
     snapshot_path: Path,
     silver_files: dict[str, Path],
-    quarantine_files: dict[str, Path],
+    quarantine_files: dict[str, Path | list[Path]],
     gold_files: dict[str, Path],
 ) -> tuple[bool, str | None]:
     """
@@ -186,10 +186,12 @@ def export_duckdb_snapshot(
                 esc = fpath.as_posix().replace("'", "''")
                 conn.execute(f"CREATE OR REPLACE TABLE silver.{tbl} AS SELECT * FROM read_parquet('{esc}')")
 
-        for ent, fpath in quarantine_files.items():
-            if fpath.exists():
-                esc = fpath.as_posix().replace("'", "''")
-                conn.execute(f"CREATE OR REPLACE TABLE quarantine.{ent} AS SELECT * FROM read_parquet('{esc}')")
+        for ent, fpaths in quarantine_files.items():
+            paths_list = [fpaths] if isinstance(fpaths, Path) else list(fpaths)
+            existing = [p for p in paths_list if p.exists()]
+            if existing:
+                paths_sql = ", ".join(f"'{p.as_posix().replace(chr(39), chr(39)*2)}'" for p in existing)
+                conn.execute(f"CREATE OR REPLACE TABLE quarantine.{ent} AS SELECT * FROM read_parquet([{paths_sql}])")
 
         for mart_name, fpath in gold_files.items():
             if fpath.exists():

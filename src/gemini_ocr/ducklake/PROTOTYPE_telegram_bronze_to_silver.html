@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROTOTYPE — Telegram Bronze → Silver Pipeline</title>
+<style>
+  :root {
+    --bg: #0b1120;
+    --surface: #111827;
+    --surface-2: #0f172a;
+    --border: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --good: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 60px;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+  .banner {
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 16px;
+    padding: 20px 24px;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  h1 { margin: 0 0 8px; font-size: 22px; font-weight: 800; color: #fff; }
+  h2 { margin: 0 0 12px; font-size: 15px; font-weight: 700; color: #fff; }
+  p { margin: 0; color: var(--muted); font-size: 14px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px 24px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .stat {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-val { font-size: 22px; font-weight: 800; color: #fff; margin-top: 2px; }
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-passed { background: rgba(52, 211, 153, 0.15); color: var(--good); border: 1px solid rgba(52, 211, 153, 0.4); }
+  .badge-warn { background: rgba(251, 191, 36, 0.15); color: var(--warn); border: 1px solid rgba(251, 191, 36, 0.4); }
+  .badge-blocked { background: rgba(248, 113, 113, 0.15); color: var(--bad); border: 1px solid rgba(248, 113, 113, 0.4); }
+  .callout {
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    font-size: 13px;
+    color: var(--text);
+  }
+  button {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  button:hover { border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); color: #082f49; border-color: var(--accent); }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab.active { background: rgba(56, 189, 248, 0.15); border-color: var(--accent); color: var(--accent); }
+  .step-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .step-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+  .step-item.done { border-color: rgba(52, 211, 153, 0.45); }
+  .tables-grid { display: flex; flex-direction: column; gap: 18px; }
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+  th { background: var(--surface-2); color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--border); font-weight: 600; white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid rgba(30, 41, 59, 0.6); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+  .empty { padding: 14px; font-size: 12px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">
+    <span class="tag">Throwaway Logic Prototype &bull; In-Memory Only</span>
+    <h1>Telegram Bronze &rarr; Silver &rarr; Quality Gate Pipeline</h1>
+    <p>
+      <strong>Question being tested:</strong> Does wrapping Telegram chat exports into Bronze envelopes,
+      deduplicating via watermarks + latest-timestamp windowing, splitting messages into 3 Silver tables
+      (<code>messages</code>, <code>service_notices</code>, <code>reactions</code>), and isolating bad records
+      into Quarantine behave predictably across normal, duplicate, partial-bad, and 100%-blocked batches?
+    </p>
+  </div>
+
+  <!-- Current State -->
+  <div class="card">
+    <div class="row" style="justify-content: space-between; margin-bottom: 14px;">
+      <h2 style="margin:0;">Current Lakehouse State (Telegram Slice)</h2>
+      <span id="statusBadge" class="badge badge-warn">NOT RUN</span>
+    </div>
+    <div class="grid-4" id="summaryStats"></div>
+    <div id="lastEventCallout" class="callout">Click any action below or start a guided walkthrough to watch records move from Bronze to Silver.</div>
+  </div>
+
+  <!-- Free-Play Actions -->
+  <div class="card">
+    <h2>Free-Play Actions</h2>
+    <div class="row">
+      <button class="primary" onclick="runAction('normal')">1. Ingest Chat Export (Valid)</button>
+      <button onclick="runAction('same')">2. Re-Ingest Identical Export (Watermark Skip)</button>
+      <button onclick="runAction('edited')">3. Ingest Edited Message (Dedup Latest Wins)</button>
+      <button onclick="runAction('mixed')">4. Ingest Mixed Batch (1 Bad + 1 Valid)</button>
+      <button onclick="runAction('blocked')">5. Ingest 100% Invalid Batch (BLOCKED Rollback)</button>
+      <button onclick="runAction('reset')">Reset Pipeline</button>
+    </div>
+  </div>
+
+  <!-- Guided Walkthroughs -->
+  <div class="card">
+    <h2>Guided Walkthroughs</h2>
+    <div class="tabs" id="walkthroughTabs"></div>
+    <p id="walkthroughDesc"></p>
+    <div class="step-list" id="walkthroughSteps"></div>
+  </div>
+
+  <!-- Live Layer Tables -->
+  <div class="card tables-grid">
+    <div>
+      <h2>Layer 1 &mdash; Bronze Envelopes (<code>lakehouse/bronze/telegram_parser/</code>)</h2>
+      <div class="tbl-wrap" id="tblBronze"></div>
+    </div>
+    <div>
+      <h2>Layer 2a &mdash; Silver Messages (<code>silver_telegram_messages</code> &mdash; Validated)</h2>
+      <div class="tbl-wrap" id="tblSilverMsg"></div>
+    </div>
+    <div>
+      <h2>Layer 2b &mdash; Silver Service Notices (<code>silver_telegram_service_notices</code>)</h2>
+      <div class="tbl-wrap" id="tblSilverNotice"></div>
+    </div>
+    <div>
+      <h2>Layer 2c &mdash; Silver Reactions (<code>silver_telegram_reactions</code>)</h2>
+      <div class="tbl-wrap" id="tblSilverReact"></div>
+    </div>
+    <div>
+      <h2>Layer 3 &mdash; Quarantine (<code>quarantine/telegram_messages</code>)</h2>
+      <div class="tbl-wrap" id="tblQuarantine"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+ * PURE PORTABLE LOGIC MODULE (No DOM / document references)
+ * Models: src/gemini_ocr/ducklake/adapters/telegram.py + silver.py + quality.py
+ * ========================================================================== */
+const TelegramPipeline = (() => {
+  function stableHash(obj) {
+    const str = JSON.stringify(obj);
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return ("00000000" + (h >>> 0).toString(16)).slice(-8);
+  }
+
+  function createInitialState() {
+    return {
+      batchSeq: 0,
+      status: "NOT RUN",
+      lastChange: "Pipeline initialized empty. No batches staged yet.",
+      watermarks: {},          // record_key -> payload_hash
+      bronzeEnvelopes: [],     // committed BronzeEnvelope records
+      silverMessages: [],
+      silverNotices: [],
+      silverReactions: [],
+      quarantine: [],
+      stats: { scanned: 0, ingested: 0, skipped: 0 }
+    };
+  }
+
+  function isValidIsoTimestamp(val) {
+    if (!val || typeof val !== "string") return false;
+    const t = Date.parse(val);
+    return !Number.isNaN(t);
+  }
+
+  function rebuildSilverAndGate(bronzeEnvelopes, batchId, evaluatedAt, existingQuarantine) {
+    // 1. Flatten Bronze payloads into raw Silver rows
+    const rawNotices = [];
+    const rawMessages = [];
+    const rawReactions = [];
+
+    for (const env of bronzeEnvelopes) {
+      const p = env.payload;
+      const chatTitle = String(p.chat_title || "Unknown Chat");
+      for (const m of (p.messages || [])) {
+        const msgId = Number(m.id || 0);
+        const mType = String(m.type || "message");
+        if (mType === "service") {
+          rawNotices.push({
+            chat_title: chatTitle,
+            message_id: msgId,
+            notice_date_text: String(m.date || ""),
+            notice_text: String(m.text || ""),
+            _batch_id: env._batch_id,
+            _ingested_at: env._ingested_at,
+            _is_test_artifact: env._is_test_artifact
+          });
+          continue;
+        }
+        const media = m.media && typeof m.media === "object" ? m.media : null;
+        rawMessages.push({
+          chat_title: chatTitle,
+          message_id: msgId,
+          from_name: m.from_name ?? null,
+          message_ts: isValidIsoTimestamp(m.date) ? new Date(m.date).toISOString() : null,
+          reply_to_message_id: m.reply_to_message_id ?? null,
+          text: String(m.text || ""),
+          has_media: media !== null,
+          media_type: media ? String(media.type) : null,
+          reaction_count: m.reaction_count != null ? Number(m.reaction_count) : 0,
+          _batch_id: env._batch_id,
+          _ingested_at: env._ingested_at,
+          _is_test_artifact: env._is_test_artifact
+        });
+        for (const rx of (m.reactions || [])) {
+          rawReactions.push({
+            chat_title: chatTitle,
+            message_id: msgId,
+            emoji: String(rx.emoji || ""),
+            reaction_count: rx.count != null ? Number(rx.count) : 0,
+            users: JSON.stringify(rx.users || []),
+            _batch_id: env._batch_id,
+            _ingested_at: env._ingested_at
+          });
+        }
+      }
+    }
+
+    // 2. Deduplicate keeping latest _ingested_at (ROW_NUMBER() OVER PARTITION BY ... ORDER BY _ingested_at DESC)
+    const dedupBy = (rows, keyFn) => {
+      const map = new Map();
+      for (const r of rows) {
+        const k = keyFn(r);
+        const prev = map.get(k);
+        if (!prev || r._ingested_at >= prev._ingested_at) map.set(k, r);
+      }
+      return Array.from(map.values());
+    };
+
+    const silverNotices = dedupBy(rawNotices, r => `${r.chat_title}::${r.message_id}`);
+    const preGateMessages = dedupBy(rawMessages, r => `${r.chat_title}::${r.message_id}`);
+    const silverReactions = dedupBy(rawReactions, r => `${r.chat_title}::${r.message_id}::${r.emoji}`);
+
+    // 3. Quality Gate on silver_telegram_messages (TG_INVALID_DATE, TG_NEGATIVE_REACTIONS)
+    const validMessages = [];
+    const newQuarantine = [];
+    for (const msg of preGateMessages) {
+      let ruleId = null;
+      let reason = null;
+      if (msg.message_ts === null) {
+        ruleId = "TG_INVALID_DATE";
+        reason = "Telegram message timestamp could not be parsed";
+      } else if (msg.reaction_count === null || msg.reaction_count < 0) {
+        ruleId = "TG_NEGATIVE_REACTIONS";
+        reason = "Telegram reaction_count cannot be negative";
+      }
+      if (ruleId) {
+        newQuarantine.push({
+          _batch_id: batchId,
+          _rule_id: ruleId,
+          _failure_reason: reason,
+          _quarantined_at: evaluatedAt,
+          raw_payload_json: JSON.stringify(msg)
+        });
+      } else {
+        validMessages.push(msg);
+      }
+    }
+
+    let status = "PASSED";
+    if (preGateMessages.length > 0 && validMessages.length === 0) {
+      status = "BLOCKED";
+    } else if (newQuarantine.length > 0) {
+      status = "PASSED_WITH_QUARANTINE";
+    }
+
+    return {
+      status,
+      silverNotices,
+      validMessages,
+      silverReactions,
+      quarantine: [...newQuarantine, ...existingQuarantine]
+    };
+  }
+
+  function ingestBatch(prevState, rawExports) {
+    const nextSeq = prevState.batchSeq + 1;
+    const batchId = `batch_${String(nextSeq).padStart(3, "0")}`;
+    const ingestedAt = new Date(Date.UTC(2026, 10, 27, 6, 0, nextSeq)).toISOString();
+
+    // Stage to Bronze using watermark check
+    const staged = [];
+    let skipped = 0;
+    const pendingWatermarks = { ...prevState.watermarks };
+
+    for (const raw of rawExports) {
+      const payload = raw.data && typeof raw.data === "object" ? raw.data : raw;
+      const recordKey = String(raw.session_id || payload.session_id || stableHash(payload));
+      const payloadHash = stableHash(payload);
+      if (pendingWatermarks[recordKey] === payloadHash) {
+        skipped++;
+        continue;
+      }
+      const isTest = payload.export_source === "messages.html" && payload.chat_title === "Min Thike Tun";
+      staged.push({
+        _batch_id: batchId,
+        _ingested_at: ingestedAt,
+        _source_name: "telegram_parser",
+        _record_key: recordKey,
+        _payload_hash: payloadHash,
+        _is_test_artifact: isTest,
+        payload
+      });
+      pendingWatermarks[recordKey] = payloadHash;
+    }
+
+    const candidateBronze = [...prevState.bronzeEnvelopes, ...staged];
+    const evalResult = rebuildSilverAndGate(candidateBronze, batchId, ingestedAt, prevState.quarantine);
+
+    // Circuit-breaker rollback if BLOCKED
+    if (evalResult.status === "BLOCKED") {
+      return {
+        ...prevState,
+        batchSeq: nextSeq,
+        status: "BLOCKED",
+        quarantine: evalResult.quarantine,
+        stats: { scanned: rawExports.length, ingested: 0, skipped },
+        lastChange: `BLOCKED (${batchId}): 100% of candidate messages failed Quality Gate. Uncommitted Bronze batch rolled back; watermarks & Silver preserved.`
+      };
+    }
+
+    return {
+      batchSeq: nextSeq,
+      status: evalResult.status,
+      watermarks: pendingWatermarks,
+      bronzeEnvelopes: candidateBronze,
+      silverMessages: evalResult.validMessages,
+      silverNotices: evalResult.silverNotices,
+      silverReactions: evalResult.silverReactions,
+      quarantine: evalResult.quarantine,
+      stats: { scanned: rawExports.length, ingested: staged.length, skipped },
+      lastChange:
+        staged.length === 0
+          ? `${batchId}: Watermark matched all ${skipped} export(s) — 0 new Bronze rows written.`
+          : `${batchId} (${evalResult.status}): Staged ${staged.length} Bronze envelope(s) -> ${evalResult.validMessages.length} valid Silver message(s), ${evalResult.silverNotices.length} notice(s), ${evalResult.silverReactions.length} reaction(s).`
+    };
+  }
+
+  return { createInitialState, ingestBatch };
+})();
+
+/* ============================================================================
+ * THROWAWAY UI SHELL (Sample Fixtures + Guided Walkthroughs + DOM Rendering)
+ * ========================================================================== */
+const SAMPLES = {
+  normal: [{
+    session_id: "tg_sess_01",
+    chat_title: "Data Eng Team",
+    export_source: "result.json",
+    messages: [
+      { id: 100, type: "service", date: "2026-11-27T01:00:00Z", text: "Group created" },
+      { id: 101, type: "message", date: "2026-11-27T01:05:00Z", from_name: "Aung", text: "Parquet export ready", media: { type: "photo" }, reaction_count: 3, reactions: [{ emoji: "🔥", count: 2, users: ["Su", "Ko"] }, { emoji: "👍", count: 1, users: ["May"] }] },
+      { id: 102, type: "message", date: "2026-11-27T01:06:00Z", from_name: "Su", reply_to_message_id: 101, text: "Nice, checking Silver!", reaction_count: 1, reactions: [{ emoji: "👍", count: 1, users: ["Aung"] }] }
+    ]
+  }],
+  edited: [{
+    session_id: "tg_sess_02",
+    chat_title: "Data Eng Team",
+    export_source: "result.json",
+    messages: [
+      { id: 101, type: "message", date: "2026-11-27T01:05:00Z", from_name: "Aung", text: "Parquet export ready (v2 edited)", media: { type: "photo" }, reaction_count: 5, reactions: [{ emoji: "🔥", count: 4, users: ["Su", "Ko", "May", "Lin"] }] }
+    ]
+  }],
+  mixed: [{
+    session_id: "tg_sess_03",
+    chat_title: "Data Eng Team",
+    export_source: "result.json",
+    messages: [
+      { id: 103, type: "message", date: "not-a-valid-date", from_name: "Bot", text: "Corrupt timestamp row", reaction_count: 0 },
+      { id: 104, type: "message", date: "2026-11-27T02:00:00Z", from_name: "Ko", text: "Healthy message after bad one", reaction_count: 2 }
+    ]
+  }],
+  blocked: [{
+    session_id: "tg_sess_bad",
+    chat_title: "Corrupt Chat",
+    export_source: "result.json",
+    messages: [
+      { id: 901, type: "message", date: "bad-date", from_name: "X", text: "Broken", reaction_count: -5 }
+    ]
+  }]
+};
+
+const WALKTHROUGHS = [
+  {
+    id: "happy",
+    title: "1. Happy Path (1 Export -> 3 Silver Tables)",
+    desc: "Watch how one nested Telegram export in Bronze is flattened into 3 separate Silver tables: messages, service notices, and reactions.",
+    steps: [
+      { label: "Ingest normal Telegram chat export", action: "normal" }
+    ]
+  },
+  {
+    id: "dedup",
+    title: "2. Watermarks & Latest-Wins Dedup",
+    desc: "First ingest the chat, then re-ingest the exact same export (skipped by watermark), then ingest an edited version of message #101 (Silver keeps only the latest).",
+    steps: [
+      { label: "Step 1: Ingest initial chat export", action: "normal" },
+      { label: "Step 2: Re-ingest identical export (expect 0 Bronze writes)", action: "same" },
+      { label: "Step 3: Ingest edited message #101 (expect 5 reactions, v2 text)", action: "edited" }
+    ]
+  },
+  {
+    id: "gate",
+    title: "3. Quality Gate & BLOCKED Rollback",
+    desc: "First ingest a mixed batch (bad row quarantined, valid row passes -> PASSED_WITH_QUARANTINE). Then ingest a 100% invalid batch on a clean pipeline to trigger BLOCKED rollback.",
+    steps: [
+      { label: "Step 1: Ingest mixed batch (1 invalid date + 1 valid)", action: "mixed" },
+      { label: "Step 2: Reset, then ingest 100% invalid batch (triggers BLOCKED)", action: "blocked_clean" }
+    ]
+  }
+];
+
+let state = TelegramPipeline.createInitialState();
+let activeTab = "happy";
+let completedSteps = new Set();
+
+function runAction(kind) {
+  if (kind === "reset") {
+    state = TelegramPipeline.createInitialState();
+  } else if (kind === "normal") {
+    state = TelegramPipeline.ingestBatch(state, SAMPLES.normal);
+  } else if (kind === "same") {
+    state = TelegramPipeline.ingestBatch(state, SAMPLES.normal);
+  } else if (kind === "edited") {
+    state = TelegramPipeline.ingestBatch(state, SAMPLES.edited);
+  } else if (kind === "mixed") {
+    state = TelegramPipeline.ingestBatch(state, SAMPLES.mixed);
+  } else if (kind === "blocked") {
+    state = TelegramPipeline.ingestBatch(state, SAMPLES.blocked);
+  } else if (kind === "blocked_clean") {
+    state = TelegramPipeline.createInitialState();
+    state = TelegramPipeline.ingestBatch(state, SAMPLES.blocked);
+  }
+  render();
+}
+
+function selectWalkthrough(id) {
+  activeTab = id;
+  state = TelegramPipeline.createInitialState();
+  completedSteps = new Set();
+  render();
+}
+
+function runWalkthroughStep(tabId, idx, action) {
+  completedSteps.add(`${tabId}:${idx}`);
+  runAction(action);
+}
+
+function renderTable(elId, cols, rows, emptyMsg) {
+  const el = document.getElementById(elId);
+  if (!rows.length) {
+    el.innerHTML = `<div class="empty">${emptyMsg}</div>`;
+    return;
+  }
+  const head = cols.map(c => `<th>${c}</th>`).join("");
+  const body = rows.map(r => `<tr>${cols.map(c => `<td>${String(r[c] ?? "NULL").replace(/</g, "&lt;")}</td>`).join("")}</tr>`).join("");
+  el.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function render() {
+  const badge = document.getElementById("statusBadge");
+  badge.textContent = state.status;
+  badge.className = "badge " + (state.status === "PASSED" ? "badge-passed" : state.status === "BLOCKED" ? "badge-blocked" : "badge-warn");
+
+  document.getElementById("lastEventCallout").textContent = state.lastChange;
+
+  const stats = [
+    ["Bronze Envelopes", state.bronzeEnvelopes.length],
+    ["Silver Messages (Valid)", state.silverMessages.length],
+    ["Silver Notices + Reactions", state.silverNotices.length + state.silverReactions.length],
+    ["Quarantined Rows", state.quarantine.length]
+  ];
+  document.getElementById("summaryStats").innerHTML = stats.map(([l, v]) =>
+    `<div class="stat"><div class="stat-label">${l}</div><div class="stat-val">${v}</div></div>`
+  ).join("");
+
+  // Walkthroughs
+  document.getElementById("walkthroughTabs").innerHTML = WALKTHROUGHS.map(w =>
+    `<button class="tab ${w.id === activeTab ? "active" : ""}" onclick="selectWalkthrough('${w.id}')">${w.title}</button>`
+  ).join("");
+  const wt = WALKTHROUGHS.find(w => w.id === activeTab);
+  document.getElementById("walkthroughDesc").textContent = wt.desc;
+  document.getElementById("walkthroughSteps").innerHTML = wt.steps.map((s, idx) => {
+    const done = completedSteps.has(`${wt.id}:${idx}`);
+    return `<div class="step-item ${done ? "done" : ""}">
+      <span style="font-size:13px;">${s.label}</span>
+      <button class="${done ? "" : "primary"}" onclick="runWalkthroughStep('${wt.id}', ${idx}, '${s.action}')">${done ? "Run Again" : "Run Step"}</button>
+    </div>`;
+  }).join("");
+
+  renderTable("tblBronze", ["_batch_id", "_record_key", "_payload_hash", "_ingested_at", "_is_test_artifact"], state.bronzeEnvelopes, "No Bronze envelopes staged.");
+  renderTable("tblSilverMsg", ["chat_title", "message_id", "from_name", "message_ts", "text", "has_media", "reaction_count", "_batch_id"], state.silverMessages, "No valid Silver messages.");
+  renderTable("tblSilverNotice", ["chat_title", "message_id", "notice_date_text", "notice_text", "_batch_id"], state.silverNotices, "No service notices.");
+  renderTable("tblSilverReact", ["chat_title", "message_id", "emoji", "reaction_count", "users", "_batch_id"], state.silverReactions, "No reactions.");
+  renderTable("tblQuarantine", ["_batch_id", "_rule_id", "_failure_reason", "raw_payload_json"], state.quarantine, "No quarantined rows.");
+}
+
+render();
+</script>
+</body>
+</html>
